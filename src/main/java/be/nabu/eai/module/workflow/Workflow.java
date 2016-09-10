@@ -39,7 +39,7 @@ import be.nabu.libs.services.api.ServiceException;
 import be.nabu.libs.services.api.ServiceInstance;
 import be.nabu.libs.services.api.ServiceInterface;
 import be.nabu.libs.services.pojo.POJOUtils;
-import be.nabu.libs.services.vm.SimpleVMServiceDefinition;
+import be.nabu.libs.services.vm.api.VMService;
 import be.nabu.libs.types.SimpleTypeWrapperFactory;
 import be.nabu.libs.types.TypeUtils;
 import be.nabu.libs.types.api.ComplexContent;
@@ -70,7 +70,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Def
 	private Map<String, TypeOperation> analyzedOperations = new HashMap<String, TypeOperation>();
 	private Map<String, WorkflowTransition> transitions = new HashMap<String, WorkflowTransition>();
 	private Map<String, WorkflowState> states = new HashMap<String, WorkflowState>();
-	private Map<String, SimpleVMServiceDefinition> mappings = new HashMap<String, SimpleVMServiceDefinition>();
+	private Map<String, VMService> mappings = new HashMap<String, VMService>();
 
 	private WorkflowInterface workflowInterface;
 	
@@ -321,7 +321,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Def
 		boolean canContinue = targetState.getTransitions() != null && !targetState.getTransitions().isEmpty() && targetState.getTransitionPicker() != null;
 		try {
 			// we execute the mapping service for this entry if any
-			SimpleVMServiceDefinition mapping = getMappings().get(transition.getId());
+			VMService mapping = getMappings().get(transition.getId());
 			if (mapping != null) {
 				ComplexContent mapInput = mapping.getServiceInterface().getInputDefinition().newInstance();
 				mapInput.set("workflow", workflow);
@@ -507,7 +507,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Def
 		return started;
 	}
 
-	public Map<String, SimpleVMServiceDefinition> getMappings() {
+	public Map<String, VMService> getMappings() {
 		return mappings;
 	}
 	
