@@ -9,7 +9,7 @@ public interface WorkflowManager {
 	public void createWorkflow(@WebParam(name = "transactionId") String transactionId, @WebParam(name = "instance") WorkflowInstance instance);
 	public void updateWorkflow(@WebParam(name = "transactionId") String transactionId, @WebParam(name = "instance") WorkflowInstance instance);
 	public WorkflowInstance getWorkflow(@WebParam(name = "workflowId") @NotNull String workflowId);
-	public List<WorkflowInstance> getRunningWorkflows(@WebParam(name = "systemId") @NotNull String systemId);
+	public List<WorkflowInstance> getRunningWorkflows(@WebParam(name = "systemId") @NotNull String systemId, @WebParam(name = "definitionId") String definitionId);
 	
 	public void createWorkflowProperty(@WebParam(name = "transactionId") String transactionId, @WebParam(name = "instance") WorkflowProperty instance);
 	public void updateWorkflowProperty(@WebParam(name = "transactionId") String transactionId, @WebParam(name = "instance") WorkflowProperty instance);

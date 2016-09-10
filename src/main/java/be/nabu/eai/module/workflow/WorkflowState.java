@@ -17,4 +17,42 @@ public class WorkflowState {
 	private boolean stateless;
 	// the possible transitions out of this state
 	private List<WorkflowTransition> transitions;
+	
+	public String getId() {
+		return id;
+	}
+	public void setId(String id) {
+		this.id = id;
+	}
+	public String getName() {
+		return name;
+	}
+	public void setName(String name) {
+		this.name = name;
+	}
+	public String getDescription() {
+		return description;
+	}
+	public void setDescription(String description) {
+		this.description = description;
+	}
+	public DefinedService getTransitionPicker() {
+		return transitionPicker;
+	}
+	public void setTransitionPicker(DefinedService transitionPicker) {
+		this.transitionPicker = transitionPicker;
+	}
+	public boolean isStateless() {
+		return stateless;
+	}
+	public void setStateless(boolean stateless) {
+		this.stateless = stateless;
+	}
+	public List<WorkflowTransition> getTransitions() {
+		return transitions;
+	}
+	public void setTransitions(List<WorkflowTransition> transitions) {
+		this.transitions = transitions;
+	}
+	
 }
