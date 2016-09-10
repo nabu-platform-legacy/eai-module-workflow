@@ -1,17 +1,13 @@
 package be.nabu.eai.module.workflow.provider;
 
 import java.util.Date;
-import java.util.List;
 
 import javax.validation.constraints.NotNull;
-
-import be.nabu.libs.types.api.KeyValuePair;
 
 public class WorkflowInstance {
 	private String id, parentId, definitionId;
 	private Date created;
 	private String stateId, batchId, contextId, environment;
-	private List<KeyValuePair> properties;
 	
 	@NotNull
 	public String getId() {
@@ -70,13 +66,6 @@ public class WorkflowInstance {
 	}
 	public void setEnvironment(String environment) {
 		this.environment = environment;
-	}
-	
-	public List<KeyValuePair> getProperties() {
-		return properties;
-	}
-	public void setProperties(List<KeyValuePair> properties) {
-		this.properties = properties;
 	}
 	
 }
