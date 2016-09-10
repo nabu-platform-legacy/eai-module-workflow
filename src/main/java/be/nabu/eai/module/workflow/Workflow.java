@@ -87,9 +87,11 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Def
 		return null;
 	}
 
+	// retry any ongoing flows from this server
 	@Override
 	public void start() throws IOException {
 		if (!started) {
+			started = true;
 			if (getConfiguration().getProvider().getConfiguration().getGetRunningWorkflows() != null) {
 				WorkflowManager workflowManager = getConfiguration().getProvider().getWorkflowManager();
 				List<WorkflowInstance> runningWorkflows = workflowManager.getRunningWorkflows(getRepository().getName(), getId());
@@ -114,7 +116,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Def
 						for (TransitionInstance transition : transitions) {
 							if (transition.getTransitionState().equals(Level.SUCCEEDED)) {
 								WorkflowTransition definition = getTransitionById(transition.getDefinitionId());
-								if (definition.getTargetState() != null && definition.getTargetState().isStateless()) {
+								if (definition.getTargetStateId() != null && getStateById(definition.getTargetStateId()).isStateless()) {
 									statelessParent = transition;
 								}
 							}
@@ -126,8 +128,8 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Def
 							if (transitions.indexOf(statelessParent) == transitions.size() - 1) {
 								WorkflowTransition transitionDefinition = getTransitionById(statelessParent.getDefinitionId());
 								// and it's an automatic, run it
-								if (transitionDefinition.getTargetState().getTransitionPicker() != null) {
-									run(workflow, getAsTransitionPicker(transitionDefinition.getTargetState().getTransitionPicker()), SystemPrincipal.ROOT, nextSequence, statelessParent, null);
+								if (getStateById(transitionDefinition.getTargetStateId()).getTransitionPicker() != null) {
+									run(workflow, getAsTransitionPicker(getStateById(transitionDefinition.getTargetStateId()).getTransitionPicker()), SystemPrincipal.ROOT, nextSequence, statelessParent, null);
 								}
 							}
 							else {
@@ -151,7 +153,6 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Def
 					}
 				}
 			}
-			started = true;
 		}
 	}
 	
@@ -175,6 +176,21 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Def
 		WorkflowTransition pickTransition = picker.pickTransition(workflow, previousTransition, workflowProperties);
 		if (pickTransition != null) {
 			run(workflow, pickTransition, principal, sequence, previousTransition, previousTransitionOutput, workflowProperties);
+		}
+		else {
+			transactionId = UUID.randomUUID().toString();
+			try {
+				workflow.setTransitionState(Level.STOPPED);
+				getConfiguration().getProvider().getWorkflowManager().updateWorkflow(transactionId, workflow);
+				WorkflowProvider.executionContext.get().getTransactionContext().commit(transactionId);
+			}
+			catch (Exception e) {
+				WorkflowProvider.executionContext.get().getTransactionContext().rollback(transactionId);
+				throw new RuntimeException(e);
+			}
+			finally {
+				WorkflowProvider.executionContext.set(null);
+			}
 		}
 	}
 	
@@ -216,15 +232,19 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Def
 		String transactionId = UUID.randomUUID().toString();
 		try {
 			getConfiguration().getProvider().getWorkflowManager().createTransition(transactionId, newInstance);
+			workflow.setTransitionState(Level.RUNNING);
+			getConfiguration().getProvider().getWorkflowManager().updateWorkflow(transactionId, workflow);
 			WorkflowProvider.executionContext.get().getTransactionContext().commit(transactionId);
 		}
 		catch (Exception e) {
 			WorkflowProvider.executionContext.get().getTransactionContext().rollback(transactionId);
+			throw new RuntimeException(e);
 		}
 		finally {
 			WorkflowProvider.executionContext.set(null);
 		}
-		
+		WorkflowState targetState = getStateById(transition.getTargetStateId());
+		boolean canContinue = targetState.getTransitions() != null && !targetState.getTransitions().isEmpty() && targetState.getTransitionPicker() != null;
 		try {
 			// we execute the mapping service for this entry if any
 			SimpleVMServiceDefinition mapping = getMappings().get(transition.getId());
@@ -295,11 +315,13 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Def
 				newInstance.setTransitionState(Level.SUCCEEDED);
 				newInstance.setStopped(new Date());
 				getConfiguration().getProvider().getWorkflowManager().updateTransition(transactionId, newInstance);
-				// if there are no further paths, update workflow as well
-				if (transition.getTargetState().getTransitions() == null || transition.getTargetState().getTransitions().isEmpty()) {
+				workflow.setStateId(targetState.getId());
+				workflow.setTransitionState(canContinue ? Level.RUNNING : Level.WAITING);
+				// if there are no further paths, set to succeeded
+				if (targetState.getTransitions() == null || targetState.getTransitions().isEmpty()) {
 					workflow.setTransitionState(Level.SUCCEEDED);
-					getConfiguration().getProvider().getWorkflowManager().updateWorkflow(transactionId, workflow);
 				}
+				getConfiguration().getProvider().getWorkflowManager().updateWorkflow(transactionId, workflow);
 				// TODO: create/update the workflow properties!
 				
 				WorkflowProvider.executionContext.get().getTransactionContext().commit(transactionId);
@@ -343,8 +365,8 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Def
 		}
 		
 		// continue execution
-		if (transition.getTargetState().getTransitions() != null && !transition.getTargetState().getTransitions().isEmpty() && transition.getTargetState().getTransitionPicker() != null) {
-			run(workflow, getAsTransitionPicker(transition.getTargetState().getTransitionPicker()), principal, sequence + 1, newInstance, output);
+		if (canContinue) {
+			run(workflow, getAsTransitionPicker(targetState.getTransitionPicker()), principal, sequence + 1, newInstance, output);
 		}
 	}
 	
@@ -356,27 +378,15 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Def
 		}
 		return null;
 	}
-	
-	public WorkflowTransition getTransitionById(String id) {
-		if (!transitions.containsKey(id)) {
-			try {
-				WorkflowState fictiveState = new WorkflowState();
-				fictiveState.setTransitions(getConfiguration().getInitialTransitions());
-				transitions.put(id, getTransitionById(id, fictiveState));
-			}
-			catch (Exception e) {
-				throw new RuntimeException(e);
-			}
-		}
-		return transitions.get(id);
-	}
-	
+
 	public WorkflowState getStateById(String id) {
 		if (!states.containsKey(id)) {
 			try {
-				WorkflowState fictiveState = new WorkflowState();
-				fictiveState.setTransitions(getConfiguration().getInitialTransitions());
-				states.put(id, getStateById(id, fictiveState));
+				for (WorkflowState state : getConfiguration().getStates()) {
+					if (state.getId().equals(id)) {
+						return state;
+					}
+				}
 			}
 			catch (Exception e) {
 				throw new RuntimeException(e);
@@ -385,42 +395,41 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Def
 		return states.get(id);
 	}
 	
+	public WorkflowTransition getTransitionById(String id) {
+		if (!transitions.containsKey(id)) {
+			try {
+				WorkflowState fictiveState = new WorkflowState();
+				fictiveState.setTransitions(getConfiguration().getInitialTransitions());
+				WorkflowTransition transition = getTransitionById(id, fictiveState);
+				if (transition == null) {
+					for (WorkflowState state : getConfiguration().getStates()) {
+						WorkflowTransition potential = getTransitionById(id, state);
+						if (potential != null) {
+							transition = potential;
+							break;
+						}
+					}
+				}
+				transitions.put(id, transition);
+			}
+			catch (Exception e) {
+				throw new RuntimeException(e);
+			}
+		}
+		return transitions.get(id);
+	}
+	
 	private WorkflowTransition getTransitionById(String id, WorkflowState state) {
 		if (state.getTransitions() != null) {
 			for (WorkflowTransition transition : state.getTransitions()) {
 				if (id.equals(transition.getId())) {
 					return transition;
 				}
-				else if (transition.getTargetState() != null) {
-					WorkflowTransition potential = getTransitionById(id, transition.getTargetState());
-					if (potential != null) {
-						return potential;
-					}
-				}
 			}
 		}
 		return null;
 	}
 	
-	private WorkflowState getStateById(String id, WorkflowState state) {
-		if (state.getTransitions() != null) {
-			for (WorkflowTransition transition : state.getTransitions()) {
-				if (transition.getTargetState() != null) {
-					if (id.equals(transition.getTargetState().getId())) {
-						return transition.getTargetState();
-					}
-					else {
-						WorkflowState potential = getStateById(id, transition.getTargetState());
-						if (potential != null) {
-							return potential;
-						}
-					}
-				}
-			}
-		}
-		return null;
-	}
-
 	@Override
 	public boolean isStarted() {
 		return started;

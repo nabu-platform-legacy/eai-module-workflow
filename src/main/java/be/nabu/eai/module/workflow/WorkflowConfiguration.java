@@ -12,6 +12,7 @@ public class WorkflowConfiguration {
 	
 	private WorkflowProvider provider;
 	private List<WorkflowTransition> initialTransitions;
+	private List<WorkflowState> states;
 
 	public List<WorkflowTransition> getInitialTransitions() {
 		return initialTransitions;
@@ -27,6 +28,13 @@ public class WorkflowConfiguration {
 	}
 	public void setProvider(WorkflowProvider provider) {
 		this.provider = provider;
+	}
+	
+	public List<WorkflowState> getStates() {
+		return states;
+	}
+	public void setStates(List<WorkflowState> states) {
+		this.states = states;
 	}
 	
 }

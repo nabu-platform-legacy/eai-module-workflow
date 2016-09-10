@@ -17,7 +17,7 @@ public class WorkflowTransition {
 	// the service to execute
 	private DefinedService service;
 	// the state we move to after the transition is done
-	private WorkflowState targetState;
+	private String targetStateId;
 	// the fields in the return value of the service to store as workflow state
 	private Map<String, String> fieldsToStore;
 	
@@ -45,11 +45,12 @@ public class WorkflowTransition {
 	public void setService(DefinedService service) {
 		this.service = service;
 	}
-	public WorkflowState getTargetState() {
-		return targetState;
+	
+	public String getTargetStateId() {
+		return targetStateId;
 	}
-	public void setTargetState(WorkflowState targetState) {
-		this.targetState = targetState;
+	public void setTargetStateId(String targetStateId) {
+		this.targetStateId = targetStateId;
 	}
 	
 	@XmlJavaTypeAdapter(KeyValueMapAdapter.class)

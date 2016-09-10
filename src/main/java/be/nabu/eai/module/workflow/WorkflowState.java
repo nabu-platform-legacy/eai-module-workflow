@@ -17,6 +17,8 @@ public class WorkflowState {
 	private boolean stateless;
 	// the possible transitions out of this state
 	private List<WorkflowTransition> transitions;
+	// visual positioning
+	private double x, y;
 	
 	public String getId() {
 		return id;
@@ -53,6 +55,19 @@ public class WorkflowState {
 	}
 	public void setTransitions(List<WorkflowTransition> transitions) {
 		this.transitions = transitions;
+	}
+	
+	public double getX() {
+		return x;
+	}
+	public void setX(double x) {
+		this.x = x;
+	}
+	public double getY() {
+		return y;
+	}
+	public void setY(double y) {
+		this.y = y;
 	}
 	
 }
