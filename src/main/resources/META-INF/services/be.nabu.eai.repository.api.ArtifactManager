@@ -1,0 +1,3 @@
+be.nabu.eai.module.datastore.provider.DatastoreProviderManager
+be.nabu.eai.module.datastore.route.DatastoreRouteManager
+be.nabu.eai.module.datastore.urn.URNProviderManager

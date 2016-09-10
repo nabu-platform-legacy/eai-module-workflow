@@ -15,6 +15,8 @@ public class TransitionInstance {
 	private Date started, stopped;
 	// any pertinent logs
 	private String log, errorLog, errorCode;
+	// the sequence number of this transition, its order in all the transitions
+	private int sequence;
 	
 	@NotNull
 	public String getId() {
@@ -97,6 +99,13 @@ public class TransitionInstance {
 	}
 	public void setErrorCode(String errorCode) {
 		this.errorCode = errorCode;
+	}
+	
+	public int getSequence() {
+		return sequence;
+	}
+	public void setSequence(int sequence) {
+		this.sequence = sequence;
 	}
 	
 }

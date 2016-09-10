@@ -9,9 +9,9 @@ public interface WorkflowManager {
 	
 	public void createWorkflowProperty(WorkflowProperty instance);
 	public void updateWorkflowProperty(WorkflowProperty instance);
-	public List<WorkflowProperty> getWorkflowProperties(String id);
+	public List<WorkflowProperty> getWorkflowProperties(String workflowId);
 	
 	public void createTransition(TransitionInstance instance);
 	public void updateTransition(TransitionInstance instance);
-	public TransitionInstance getTransition(String id);
+	public List<TransitionInstance> getTransitions(String workflowId);
 }

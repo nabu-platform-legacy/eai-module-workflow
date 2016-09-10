@@ -8,6 +8,7 @@ public class WorkflowInstance {
 	private String id, parentId, definitionId;
 	private Date created;
 	private String stateId, batchId, contextId, environment;
+	private Level transitionState;
 	
 	@NotNull
 	public String getId() {
@@ -68,4 +69,16 @@ public class WorkflowInstance {
 		this.environment = environment;
 	}
 	
+	@NotNull	
+	public Level getTransitionState() {
+		return transitionState;
+	}
+	public void setTransitionState(Level transitionState) {
+		this.transitionState = transitionState;
+	}
+
+	public static enum Level {
+		SUCCESS,
+		ERROR
+	}
 }
