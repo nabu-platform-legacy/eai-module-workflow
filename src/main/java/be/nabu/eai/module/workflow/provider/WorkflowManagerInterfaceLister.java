@@ -24,8 +24,8 @@ private static Collection<InterfaceDescription> descriptions = null;
 					descriptions.add(new InterfaceDescriptionImpl("Workflow", "Create Transition", "be.nabu.eai.module.workflow.provider.WorkflowManager.createTransition"));
 					descriptions.add(new InterfaceDescriptionImpl("Workflow", "Update Transition", "be.nabu.eai.module.workflow.provider.WorkflowManager.updateTransition"));
 					descriptions.add(new InterfaceDescriptionImpl("Workflow", "Get Transitions", "be.nabu.eai.module.workflow.provider.WorkflowManager.getTransitions"));
-					descriptions.add(new InterfaceDescriptionImpl("Workflow", "Create Workflow Property", "be.nabu.eai.module.workflow.provider.WorkflowManager.createWorkflowProperty"));
-					descriptions.add(new InterfaceDescriptionImpl("Workflow", "Update Workflow Property", "be.nabu.eai.module.workflow.provider.WorkflowManager.updateWorkflowProperty"));
+					descriptions.add(new InterfaceDescriptionImpl("Workflow", "Create Workflow Properties", "be.nabu.eai.module.workflow.provider.WorkflowManager.createWorkflowProperties"));
+					descriptions.add(new InterfaceDescriptionImpl("Workflow", "Update Workflow Properties", "be.nabu.eai.module.workflow.provider.WorkflowManager.updateWorkflowProperties"));
 					descriptions.add(new InterfaceDescriptionImpl("Workflow", "Get Workflow Properties", "be.nabu.eai.module.workflow.provider.WorkflowManager.getWorkflowProperties"));
 					WorkflowManagerInterfaceLister.descriptions = descriptions;
 				}

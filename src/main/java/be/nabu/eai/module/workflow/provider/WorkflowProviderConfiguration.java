@@ -13,7 +13,7 @@ public class WorkflowProviderConfiguration {
 
 	private DefinedService createWorkflow, updateWorkflow, getWorkflow, 
 		createTransition, updateTransition, getTransitions,
-		createWorkflowProperty, updateWorkflowProperty, getWorkflowProperties,
+		createWorkflowProperties, updateWorkflowProperties, getWorkflowProperties,
 		getRunningWorkflows;
 
 	@InterfaceFilter(implement = "be.nabu.eai.module.workflow.provider.WorkflowManager.createWorkflow")
@@ -85,24 +85,24 @@ public class WorkflowProviderConfiguration {
 		this.getTransitions = getTransitions;
 	}
 
-	@InterfaceFilter(implement = "be.nabu.eai.module.workflow.provider.WorkflowManager.createWorkflowProperty")
+	@InterfaceFilter(implement = "be.nabu.eai.module.workflow.provider.WorkflowManager.createWorkflowProperties")
 	@XmlJavaTypeAdapter(value = ArtifactXMLAdapter.class)
 	@NotNull
-	public DefinedService getCreateWorkflowProperty() {
-		return createWorkflowProperty;
+	public DefinedService getCreateWorkflowProperties() {
+		return createWorkflowProperties;
 	}
-	public void setCreateWorkflowProperty(DefinedService createWorkflowProperty) {
-		this.createWorkflowProperty = createWorkflowProperty;
+	public void setCreateWorkflowProperties(DefinedService createWorkflowProperty) {
+		this.createWorkflowProperties = createWorkflowProperty;
 	}
 
-	@InterfaceFilter(implement = "be.nabu.eai.module.workflow.provider.WorkflowManager.updateWorkflowProperty")
+	@InterfaceFilter(implement = "be.nabu.eai.module.workflow.provider.WorkflowManager.updateWorkflowProperties")
 	@XmlJavaTypeAdapter(value = ArtifactXMLAdapter.class)
 	@NotNull
-	public DefinedService getUpdateWorkflowProperty() {
-		return updateWorkflowProperty;
+	public DefinedService getUpdateWorkflowProperties() {
+		return updateWorkflowProperties;
 	}
-	public void setUpdateWorkflowProperty(DefinedService updateWorkflowProperty) {
-		this.updateWorkflowProperty = updateWorkflowProperty;
+	public void setUpdateWorkflowProperties(DefinedService updateWorkflowProperty) {
+		this.updateWorkflowProperties = updateWorkflowProperty;
 	}
 
 	@InterfaceFilter(implement = "be.nabu.eai.module.workflow.provider.WorkflowManager.getWorkflowProperties")

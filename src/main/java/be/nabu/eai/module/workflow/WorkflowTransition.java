@@ -1,7 +1,10 @@
 package be.nabu.eai.module.workflow;
 
-import java.util.List;
+import java.util.Map;
 
+import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
+
+import be.nabu.eai.repository.util.KeyValueMapAdapter;
 import be.nabu.libs.services.api.DefinedService;
 
 // can not directly refer to target state as this may result in circular references!!
@@ -16,7 +19,7 @@ public class WorkflowTransition {
 	// the state we move to after the transition is done
 	private WorkflowState targetState;
 	// the fields in the return value of the service to store as workflow state
-	private List<String> fieldsToStore;
+	private Map<String, String> fieldsToStore;
 	
 	public String getId() {
 		return id;
@@ -48,10 +51,12 @@ public class WorkflowTransition {
 	public void setTargetState(WorkflowState targetState) {
 		this.targetState = targetState;
 	}
-	public List<String> getFieldsToStore() {
+	
+	@XmlJavaTypeAdapter(KeyValueMapAdapter.class)
+	public Map<String, String> getFieldsToStore() {
 		return fieldsToStore;
 	}
-	public void setFieldsToStore(List<String> fieldsToStore) {
+	public void setFieldsToStore(Map<String, String> fieldsToStore) {
 		this.fieldsToStore = fieldsToStore;
 	}
 	

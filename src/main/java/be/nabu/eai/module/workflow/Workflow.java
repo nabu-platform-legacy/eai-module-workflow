@@ -13,15 +13,13 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-import javax.jws.WebResult;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import be.nabu.eai.module.workflow.provider.TransitionInstance;
 import be.nabu.eai.module.workflow.provider.WorkflowInstance;
-import be.nabu.eai.module.workflow.provider.WorkflowManager;
 import be.nabu.eai.module.workflow.provider.WorkflowInstance.Level;
+import be.nabu.eai.module.workflow.provider.WorkflowManager;
 import be.nabu.eai.module.workflow.provider.WorkflowProperty;
 import be.nabu.eai.module.workflow.provider.WorkflowProvider;
 import be.nabu.eai.repository.EAIRepositoryUtils;
@@ -29,6 +27,11 @@ import be.nabu.eai.repository.api.Repository;
 import be.nabu.eai.repository.artifacts.jaxb.JAXBArtifact;
 import be.nabu.eai.repository.util.SystemPrincipal;
 import be.nabu.libs.artifacts.api.StartableArtifact;
+import be.nabu.libs.converter.ConverterFactory;
+import be.nabu.libs.evaluator.PathAnalyzer;
+import be.nabu.libs.evaluator.QueryParser;
+import be.nabu.libs.evaluator.types.api.TypeOperation;
+import be.nabu.libs.evaluator.types.operations.TypesOperationProvider;
 import be.nabu.libs.resources.api.ResourceContainer;
 import be.nabu.libs.services.ServiceRuntime;
 import be.nabu.libs.services.api.DefinedService;
@@ -37,7 +40,6 @@ import be.nabu.libs.services.api.ServiceInstance;
 import be.nabu.libs.services.api.ServiceInterface;
 import be.nabu.libs.services.pojo.POJOUtils;
 import be.nabu.libs.services.vm.SimpleVMServiceDefinition;
-import be.nabu.libs.services.vm.VMContext;
 import be.nabu.libs.types.api.ComplexContent;
 
 // expose folders for each state with transition methods (input extends actual transition service input + workflow instance id)
@@ -54,6 +56,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Def
 	
 	private Logger logger = LoggerFactory.getLogger(getClass());
 	
+	private Map<String, TypeOperation> analyzedOperations = new HashMap<String, TypeOperation>();
 	private Map<String, WorkflowTransition> transitions = new HashMap<String, WorkflowTransition>();
 	private Map<String, WorkflowState> states = new HashMap<String, WorkflowState>();
 	private Map<String, SimpleVMServiceDefinition> mappings = new HashMap<String, SimpleVMServiceDefinition>();
@@ -156,11 +159,42 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Def
 		return service == null ? null : POJOUtils.newProxy(TransitionPicker.class, getRepository(), SystemPrincipal.ROOT, service);
 	}
 	
-	public void run(WorkflowInstance workflow, TransitionPicker picker, Principal principal, int sequence, TransitionInstance previousTransition, ComplexContent previousTransitionOutput) {
-		
+	public void run(WorkflowInstance workflow, TransitionPicker picker, Principal principal, int sequence, TransitionInstance previousTransition, ComplexContent previousTransitionOutput) throws IOException {
+		String transactionId = UUID.randomUUID().toString();
+		List<WorkflowProperty> workflowProperties;
+		try {
+			workflowProperties = getConfiguration().getProvider().getWorkflowManager().getWorkflowProperties(workflow.getId());
+		}
+		catch (Exception e) {
+			WorkflowProvider.executionContext.get().getTransactionContext().rollback(transactionId);
+			throw new RuntimeException(e);
+		}
+		finally {
+			WorkflowProvider.executionContext.set(null);
+		}
+		WorkflowTransition pickTransition = picker.pickTransition(workflow, previousTransition, workflowProperties);
+		if (pickTransition != null) {
+			run(workflow, pickTransition, principal, sequence, previousTransition, previousTransitionOutput, workflowProperties);
+		}
 	}
 	
 	public void run(WorkflowInstance workflow, WorkflowTransition transition, Principal principal, int sequence, TransitionInstance previousTransition, ComplexContent previousTransitionOutput) throws IOException {
+		String transactionId = UUID.randomUUID().toString();
+		List<WorkflowProperty> workflowProperties;
+		try {
+			workflowProperties = getConfiguration().getProvider().getWorkflowManager().getWorkflowProperties(workflow.getId());
+		}
+		catch (Exception e) {
+			WorkflowProvider.executionContext.get().getTransactionContext().rollback(transactionId);
+			throw new RuntimeException(e);
+		}
+		finally {
+			WorkflowProvider.executionContext.set(null);
+		}
+		run(workflow, transition, principal, sequence, previousTransition, previousTransitionOutput, workflowProperties);
+		
+	}
+	public void run(WorkflowInstance workflow, WorkflowTransition transition, Principal principal, int sequence, TransitionInstance previousTransition, ComplexContent previousTransitionOutput, List<WorkflowProperty> workflowProperties) throws IOException {	
 		ComplexContent input, output;
 		
 		// we create the transition entry
@@ -195,7 +229,6 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Def
 			// we execute the mapping service for this entry if any
 			SimpleVMServiceDefinition mapping = getMappings().get(transition.getId());
 			if (mapping != null) {
-				List<WorkflowProperty> workflowProperties = getConfiguration().getProvider().getWorkflowManager().getWorkflowProperties(workflow.getId());
 				ComplexContent mapInput = mapping.getServiceInterface().getInputDefinition().newInstance();
 				mapInput.set("workflow", workflow);
 				mapInput.set("properties", workflowProperties);
@@ -219,10 +252,41 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Def
 			List<WorkflowProperty> propertiesToUpdate = new ArrayList<WorkflowProperty>();
 			List<WorkflowProperty> propertiesToCreate = new ArrayList<WorkflowProperty>();
 			if (transition.getFieldsToStore() != null) {
-				
-				for (String fieldToStore : transition.getFieldsToStore()) {
-					// TODO: perform stores where necessary
-					// merge intelligently with properties
+				for (String fieldToStore : transition.getFieldsToStore().keySet()) {
+					String query = transition.getFieldsToStore().get(fieldToStore);
+					if (!analyzedOperations.containsKey(query)) {
+						synchronized(analyzedOperations) {
+							if (!analyzedOperations.containsKey(query)) {
+								analyzedOperations.put(query, (TypeOperation) new PathAnalyzer<ComplexContent>(new TypesOperationProvider()).analyze(QueryParser.getInstance().parse(query)));
+							}
+						}
+					}
+					Object value = analyzedOperations.get(query).evaluate(output);
+					boolean found = false;
+					for (WorkflowProperty property : workflowProperties) {
+						if (property.getKey().equals(fieldToStore)) {
+							property.setValue(value == null || value instanceof String ? (String) value : ConverterFactory.getInstance().getConverter().convert(value, String.class));
+							property.setTransitionId(newInstance.getId());
+							propertiesToUpdate.add(property);
+							found = true;
+							break;
+						}
+					}
+					if (!found) {
+						WorkflowProperty property = new WorkflowProperty();
+						property.setId(UUID.randomUUID().toString());
+						property.setWorkflowId(workflow.getId());
+						property.setTransitionId(newInstance.getId());
+						property.setKey(fieldToStore);
+						property.setValue(value == null || value instanceof String ? (String) value : ConverterFactory.getInstance().getConverter().convert(value, String.class));
+						propertiesToCreate.add(property);
+					}
+					if (!propertiesToCreate.isEmpty()) {
+						getConfiguration().getProvider().getWorkflowManager().createWorkflowProperties(transactionId, propertiesToCreate);
+					}
+					if (!propertiesToUpdate.isEmpty()) {
+						getConfiguration().getProvider().getWorkflowManager().updateWorkflowProperties(transactionId, propertiesToUpdate);
+					}
 				}
 			}
 			
