@@ -13,7 +13,8 @@ public class WorkflowProviderConfiguration {
 
 	private DefinedService createWorkflow, updateWorkflow, getWorkflow, 
 		createTransition, updateTransition, getTransitions,
-		createWorkflowProperty, updateWorkflowProperty, getWorkflowProperties;
+		createWorkflowProperty, updateWorkflowProperty, getWorkflowProperties,
+		getRunningWorkflows;
 
 	@InterfaceFilter(implement = "be.nabu.eai.module.workflow.provider.WorkflowManager.createWorkflow")
 	@XmlJavaTypeAdapter(value = ArtifactXMLAdapter.class)
@@ -44,7 +45,16 @@ public class WorkflowProviderConfiguration {
 	public void setGetWorkflow(DefinedService getWorkflow) {
 		this.getWorkflow = getWorkflow;
 	}
-
+	
+	@InterfaceFilter(implement = "be.nabu.eai.module.workflow.provider.WorkflowManager.getRunningWorkflows")
+	@XmlJavaTypeAdapter(value = ArtifactXMLAdapter.class)
+	public DefinedService getGetRunningWorkflows() {
+		return getRunningWorkflows;
+	}
+	public void setGetRunningWorkflows(DefinedService getRunningWorkflows) {
+		this.getRunningWorkflows = getRunningWorkflows;
+	}
+	
 	@InterfaceFilter(implement = "be.nabu.eai.module.workflow.provider.WorkflowManager.createTransition")
 	@XmlJavaTypeAdapter(value = ArtifactXMLAdapter.class)
 	@NotNull

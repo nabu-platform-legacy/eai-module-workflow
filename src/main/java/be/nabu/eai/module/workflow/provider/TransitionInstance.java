@@ -4,6 +4,8 @@ import java.util.Date;
 
 import javax.validation.constraints.NotNull;
 
+import be.nabu.eai.module.workflow.provider.WorkflowInstance.Level;
+
 public class TransitionInstance {
 	// the parent id is of the transition that came before
 	private String id, workflowId, parentId, definitionId;
@@ -17,6 +19,8 @@ public class TransitionInstance {
 	private String log, errorLog, errorCode;
 	// the sequence number of this transition, its order in all the transitions
 	private int sequence;
+	// the state the transition ended in
+	private Level transitionState;
 	
 	@NotNull
 	public String getId() {
@@ -106,6 +110,13 @@ public class TransitionInstance {
 	}
 	public void setSequence(int sequence) {
 		this.sequence = sequence;
+	}
+	
+	public Level getTransitionState() {
+		return transitionState;
+	}
+	public void setTransitionState(Level transitionState) {
+		this.transitionState = transitionState;
 	}
 	
 }

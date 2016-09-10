@@ -78,7 +78,9 @@ public class WorkflowInstance {
 	}
 
 	public static enum Level {
-		SUCCESS,
-		ERROR
+		RUNNING,
+		SUCCEEDED,
+		FAILED,
+		REVERTED
 	}
 }

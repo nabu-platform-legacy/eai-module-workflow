@@ -48,5 +48,4 @@ public class WorkflowProperty implements KeyValuePair {
 		this.transitionId = transitionId;
 	}
 	
-	
 }
