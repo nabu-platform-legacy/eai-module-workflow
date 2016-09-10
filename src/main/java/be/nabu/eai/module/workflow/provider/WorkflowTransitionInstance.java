@@ -6,7 +6,7 @@ import javax.validation.constraints.NotNull;
 
 import be.nabu.eai.module.workflow.provider.WorkflowInstance.Level;
 
-public class TransitionInstance implements Comparable<TransitionInstance> {
+public class WorkflowTransitionInstance implements Comparable<WorkflowTransitionInstance> {
 	// the parent id is of the transition that came before
 	private String id, workflowId, parentId, definitionId;
 	// whoever triggered this transition
@@ -118,7 +118,7 @@ public class TransitionInstance implements Comparable<TransitionInstance> {
 		this.transitionState = transitionState;
 	}
 	@Override
-	public int compareTo(TransitionInstance o) {
+	public int compareTo(WorkflowTransitionInstance o) {
 		return sequence - o.sequence;
 	}
 	

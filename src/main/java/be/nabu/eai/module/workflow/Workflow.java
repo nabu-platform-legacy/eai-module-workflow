@@ -16,7 +16,7 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import be.nabu.eai.module.workflow.provider.TransitionInstance;
+import be.nabu.eai.module.workflow.provider.WorkflowTransitionInstance;
 import be.nabu.eai.module.workflow.provider.WorkflowInstance;
 import be.nabu.eai.module.workflow.provider.WorkflowInstance.Level;
 import be.nabu.eai.module.workflow.provider.WorkflowManager;
@@ -40,7 +40,16 @@ import be.nabu.libs.services.api.ServiceInstance;
 import be.nabu.libs.services.api.ServiceInterface;
 import be.nabu.libs.services.pojo.POJOUtils;
 import be.nabu.libs.services.vm.SimpleVMServiceDefinition;
+import be.nabu.libs.types.SimpleTypeWrapperFactory;
+import be.nabu.libs.types.TypeUtils;
 import be.nabu.libs.types.api.ComplexContent;
+import be.nabu.libs.types.api.ComplexType;
+import be.nabu.libs.types.base.ComplexElementImpl;
+import be.nabu.libs.types.base.SimpleElementImpl;
+import be.nabu.libs.types.base.ValueImpl;
+import be.nabu.libs.types.java.BeanResolver;
+import be.nabu.libs.types.properties.MinOccursProperty;
+import be.nabu.libs.types.structure.Structure;
 
 // expose folders for each state with transition methods (input extends actual transition service input + workflow instance id)
 // only expose if state is manual? as in, no transition picker
@@ -50,6 +59,8 @@ import be.nabu.libs.types.api.ComplexContent;
 // 		> end up in previous state (even if automatic picker) and need to resolve manually? if stateless, can pick it up again
 // retry picks closest stateless state that it passed and goes from there
 // can also retry from a chosen stateless state _that the workflow passed through_
+
+// TODO: add security checks for transitions
 public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements DefinedService, StartableArtifact {
 
 	private boolean started;
@@ -60,6 +71,8 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Def
 	private Map<String, WorkflowTransition> transitions = new HashMap<String, WorkflowTransition>();
 	private Map<String, WorkflowState> states = new HashMap<String, WorkflowState>();
 	private Map<String, SimpleVMServiceDefinition> mappings = new HashMap<String, SimpleVMServiceDefinition>();
+
+	private WorkflowInterface workflowInterface;
 	
 	public Workflow(String id, ResourceContainer<?> directory, Repository repository) {
 		super(id, directory, repository, "workflow.xml", WorkflowConfiguration.class);
@@ -67,19 +80,78 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Def
 
 	@Override
 	public ServiceInterface getServiceInterface() {
-		// the input has a document containing one input document per initial transition possible
-		// this starts a new workflow
-		// also add a batch id to link multiple workflows started in a batch
-		// context id is free to choose, if not filled in, it should be the id of the workflow
-		// environment is autofilled
-		// TODO Auto-generated method stub
-		return null;
+		if (workflowInterface == null) {
+			synchronized(this) {
+				if (workflowInterface == null) {
+					workflowInterface = new WorkflowInterface(this);
+				}
+			}
+		}
+		return workflowInterface;
+	}
+	
+	public static class WorkflowInterface implements ServiceInterface {
+
+		private Workflow flow;
+		private Structure input, output;
+
+		public WorkflowInterface(Workflow flow) {
+			this.flow = flow;
+		}
+		
+		@Override
+		public ComplexType getInputDefinition() {
+			if (input == null) {
+				synchronized(this) {
+					if (input == null) {
+						Structure input = new Structure();
+						try {
+							input.add(new SimpleElementImpl<String>("batchId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
+							input.add(new SimpleElementImpl<String>("contextId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
+							input.add(new SimpleElementImpl<String>("parentId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
+							for (WorkflowTransition transition : flow.getConfiguration().getInitialTransitions()) {
+								if (transition.getService() != null) {
+									ComplexType inputDefinition = transition.getService().getServiceInterface().getInputDefinition();
+									// only if there is a child component
+									if (TypeUtils.getAllChildren(inputDefinition).iterator().hasNext()) {
+										input.add(new ComplexElementImpl(EAIRepositoryUtils.stringToField(transition.getName()), inputDefinition, input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
+									}
+								}
+							}
+						}
+						catch (Exception e) {
+							throw new RuntimeException(e);
+						}
+						this.input = input;
+					}
+				}
+			}
+			return input;
+		}
+
+		@Override
+		public ComplexType getOutputDefinition() {
+			if (output == null) {
+				synchronized(this) {
+					if (output == null) {
+						Structure output = new Structure();
+						output.add(new ComplexElementImpl("workflow", (ComplexType) BeanResolver.getInstance().resolve(WorkflowInstance.class), output));
+						this.output = output;
+					}
+				}
+			}
+			return output;
+		}
+
+		@Override
+		public ServiceInterface getParent() {
+			return null;
+		}
 	}
 
 	@Override
 	public ServiceInstance newInstance() {
-		// TODO Auto-generated method stub
-		return null;
+		return new WorkflowServiceInstance(this);
 	}
 
 	@Override
@@ -102,9 +174,9 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Def
 						workflow.setTransitionState(Level.REVERTED);
 						workflowManager.updateWorkflow(transactionId, workflow);
 						
-						List<TransitionInstance> transitions = workflowManager.getTransitions(workflow.getId());
+						List<WorkflowTransitionInstance> transitions = workflowManager.getTransitions(workflow.getId());
 						Collections.sort(transitions);
-						TransitionInstance last = transitions.get(transitions.size() - 1);
+						WorkflowTransitionInstance last = transitions.get(transitions.size() - 1);
 						if (last.getTransitionState().equals(Level.RUNNING)) {
 							// revert the original transition
 							last.setTransitionState(Level.REVERTED);
@@ -112,8 +184,8 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Def
 							workflowManager.updateTransition(transactionId, last);
 						}
 						// find nearest successful transition that ended in a stateless state, we can go from there
-						TransitionInstance statelessParent = null;
-						for (TransitionInstance transition : transitions) {
+						WorkflowTransitionInstance statelessParent = null;
+						for (WorkflowTransitionInstance transition : transitions) {
 							if (transition.getTransitionState().equals(Level.SUCCEEDED)) {
 								WorkflowTransition definition = getTransitionById(transition.getDefinitionId());
 								if (definition.getTargetStateId() != null && getStateById(definition.getTargetStateId()).isStateless()) {
@@ -134,7 +206,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Def
 							}
 							else {
 								// we first need the next transition attempted, so we know how the workflow was supposed to go
-								TransitionInstance nextTransition = getTransitionBySequence(transitions, statelessParent.getSequence() + 1);
+								WorkflowTransitionInstance nextTransition = getTransitionBySequence(transitions, statelessParent.getSequence() + 1);
 								WorkflowTransition transitionDefinition = getTransitionById(nextTransition.getDefinitionId());
 								run(workflow, transitionDefinition, SystemPrincipal.ROOT, nextSequence, statelessParent, null);
 							}
@@ -160,11 +232,12 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Def
 		return service == null ? null : POJOUtils.newProxy(TransitionPicker.class, getRepository(), SystemPrincipal.ROOT, service);
 	}
 	
-	public void run(WorkflowInstance workflow, TransitionPicker picker, Principal principal, int sequence, TransitionInstance previousTransition, ComplexContent previousTransitionOutput) throws IOException {
+	public void run(WorkflowInstance workflow, TransitionPicker picker, Principal principal, int sequence, WorkflowTransitionInstance previousTransition, ComplexContent previousTransitionOutput) throws IOException {
 		String transactionId = UUID.randomUUID().toString();
 		List<WorkflowProperty> workflowProperties;
 		try {
 			workflowProperties = getConfiguration().getProvider().getWorkflowManager().getWorkflowProperties(workflow.getId());
+			WorkflowProvider.executionContext.get().getTransactionContext().commit(transactionId);
 		}
 		catch (Exception e) {
 			WorkflowProvider.executionContext.get().getTransactionContext().rollback(transactionId);
@@ -194,11 +267,12 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Def
 		}
 	}
 	
-	public void run(WorkflowInstance workflow, WorkflowTransition transition, Principal principal, int sequence, TransitionInstance previousTransition, ComplexContent previousTransitionOutput) throws IOException {
+	public void run(WorkflowInstance workflow, WorkflowTransition transition, Principal principal, int sequence, WorkflowTransitionInstance previousTransition, ComplexContent previousTransitionOutput) throws IOException {
 		String transactionId = UUID.randomUUID().toString();
 		List<WorkflowProperty> workflowProperties;
 		try {
 			workflowProperties = getConfiguration().getProvider().getWorkflowManager().getWorkflowProperties(workflow.getId());
+			WorkflowProvider.executionContext.get().getTransactionContext().commit(transactionId);
 		}
 		catch (Exception e) {
 			WorkflowProvider.executionContext.get().getTransactionContext().rollback(transactionId);
@@ -210,11 +284,11 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Def
 		run(workflow, transition, principal, sequence, previousTransition, previousTransitionOutput, workflowProperties);
 		
 	}
-	public void run(WorkflowInstance workflow, WorkflowTransition transition, Principal principal, int sequence, TransitionInstance previousTransition, ComplexContent previousTransitionOutput, List<WorkflowProperty> workflowProperties) throws IOException {	
+	public void run(WorkflowInstance workflow, WorkflowTransition transition, Principal principal, int sequence, WorkflowTransitionInstance previousTransition, ComplexContent previousTransitionOutput, List<WorkflowProperty> workflowProperties) throws IOException {	
 		ComplexContent input, output;
 		
 		// we create the transition entry
-		TransitionInstance newInstance = new TransitionInstance();
+		WorkflowTransitionInstance newInstance = new WorkflowTransitionInstance();
 		if (principal != null) {
 			newInstance.setActorId(principal.getName());
 		}
@@ -322,8 +396,6 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Def
 					workflow.setTransitionState(Level.SUCCEEDED);
 				}
 				getConfiguration().getProvider().getWorkflowManager().updateWorkflow(transactionId, workflow);
-				// TODO: create/update the workflow properties!
-				
 				WorkflowProvider.executionContext.get().getTransactionContext().commit(transactionId);
 			}
 			catch (Exception e) {
@@ -370,8 +442,8 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Def
 		}
 	}
 	
-	public static TransitionInstance getTransitionBySequence(List<TransitionInstance> instances, int sequence) {
-		for (TransitionInstance instance : instances) {
+	public static WorkflowTransitionInstance getTransitionBySequence(List<WorkflowTransitionInstance> instances, int sequence) {
+		for (WorkflowTransitionInstance instance : instances) {
 			if (instance.getSequence() == sequence) {
 				return instance;
 			}

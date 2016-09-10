@@ -19,8 +19,8 @@ public interface WorkflowManager {
 	@WebResult(name = "properties")
 	public List<WorkflowProperty> getWorkflowProperties(@WebParam(name = "workflowId") @NotNull String workflowId);
 	
-	public void createTransition(@WebParam(name = "transactionId") String transactionId, @WebParam(name = "instance") TransitionInstance instance);
-	public void updateTransition(@WebParam(name = "transactionId") String transactionId, @WebParam(name = "instance") TransitionInstance instance);
+	public void createTransition(@WebParam(name = "transactionId") String transactionId, @WebParam(name = "instance") WorkflowTransitionInstance instance);
+	public void updateTransition(@WebParam(name = "transactionId") String transactionId, @WebParam(name = "instance") WorkflowTransitionInstance instance);
 	@WebResult(name = "transitions")
-	public List<TransitionInstance> getTransitions(@WebParam(name = "workflowId") @NotNull String workflowId);
+	public List<WorkflowTransitionInstance> getTransitions(@WebParam(name = "workflowId") @NotNull String workflowId);
 }

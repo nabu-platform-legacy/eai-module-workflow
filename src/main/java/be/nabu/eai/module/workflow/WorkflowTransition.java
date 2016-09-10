@@ -1,5 +1,6 @@
 package be.nabu.eai.module.workflow;
 
+import java.util.List;
 import java.util.Map;
 
 import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
@@ -20,6 +21,8 @@ public class WorkflowTransition {
 	private String targetStateId;
 	// the fields in the return value of the service to store as workflow state
 	private Map<String, String> fieldsToStore;
+	// the roles that are allowed to run this transition
+	private List<String> roles;
 	
 	public String getId() {
 		return id;
@@ -59,6 +62,13 @@ public class WorkflowTransition {
 	}
 	public void setFieldsToStore(Map<String, String> fieldsToStore) {
 		this.fieldsToStore = fieldsToStore;
+	}
+	
+	public List<String> getRoles() {
+		return roles;
+	}
+	public void setRoles(List<String> roles) {
+		this.roles = roles;
 	}
 	
 }
