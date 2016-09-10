@@ -3,8 +3,9 @@ package be.nabu.eai.module.workflow;
 import java.util.List;
 
 import be.nabu.libs.services.api.DefinedService;
-import be.nabu.libs.services.vm.step.Map;
 
+// can not directly refer to target state as this may result in circular references!!
+// must refer to the id of the target state, separate resolving
 public class WorkflowTransition {
 	// a generated if for this state
 	private String id;
@@ -14,8 +15,6 @@ public class WorkflowTransition {
 	private DefinedService service;
 	// the state we move to after the transition is done
 	private WorkflowState targetState;
-	// the map step required to map the input
-	private Map inputMapping;
 	// the fields in the return value of the service to store as workflow state
 	private List<String> fieldsToStore;
 	
@@ -48,12 +47,6 @@ public class WorkflowTransition {
 	}
 	public void setTargetState(WorkflowState targetState) {
 		this.targetState = targetState;
-	}
-	public Map getInputMapping() {
-		return inputMapping;
-	}
-	public void setInputMapping(Map inputMapping) {
-		this.inputMapping = inputMapping;
 	}
 	public List<String> getFieldsToStore() {
 		return fieldsToStore;

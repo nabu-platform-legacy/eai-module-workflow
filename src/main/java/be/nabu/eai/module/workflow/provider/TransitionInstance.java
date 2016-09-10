@@ -53,7 +53,6 @@ public class TransitionInstance implements Comparable<TransitionInstance> {
 		this.definitionId = definitionId;
 	}
 	
-	@NotNull
 	public String getActorId() {
 		return actorId;
 	}

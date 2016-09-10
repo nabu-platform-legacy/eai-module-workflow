@@ -1,6 +1,10 @@
 package be.nabu.eai.module.workflow;
 
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.security.Principal;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
@@ -9,18 +13,32 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import javax.jws.WebResult;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import be.nabu.eai.module.workflow.provider.TransitionInstance;
 import be.nabu.eai.module.workflow.provider.WorkflowInstance;
 import be.nabu.eai.module.workflow.provider.WorkflowManager;
 import be.nabu.eai.module.workflow.provider.WorkflowInstance.Level;
+import be.nabu.eai.module.workflow.provider.WorkflowProperty;
 import be.nabu.eai.module.workflow.provider.WorkflowProvider;
+import be.nabu.eai.repository.EAIRepositoryUtils;
 import be.nabu.eai.repository.api.Repository;
 import be.nabu.eai.repository.artifacts.jaxb.JAXBArtifact;
+import be.nabu.eai.repository.util.SystemPrincipal;
 import be.nabu.libs.artifacts.api.StartableArtifact;
 import be.nabu.libs.resources.api.ResourceContainer;
+import be.nabu.libs.services.ServiceRuntime;
 import be.nabu.libs.services.api.DefinedService;
+import be.nabu.libs.services.api.ServiceException;
 import be.nabu.libs.services.api.ServiceInstance;
 import be.nabu.libs.services.api.ServiceInterface;
+import be.nabu.libs.services.pojo.POJOUtils;
+import be.nabu.libs.services.vm.SimpleVMServiceDefinition;
+import be.nabu.libs.services.vm.VMContext;
+import be.nabu.libs.types.api.ComplexContent;
 
 // expose folders for each state with transition methods (input extends actual transition service input + workflow instance id)
 // only expose if state is manual? as in, no transition picker
@@ -34,8 +52,11 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Def
 
 	private boolean started;
 	
+	private Logger logger = LoggerFactory.getLogger(getClass());
+	
 	private Map<String, WorkflowTransition> transitions = new HashMap<String, WorkflowTransition>();
 	private Map<String, WorkflowState> states = new HashMap<String, WorkflowState>();
+	private Map<String, SimpleVMServiceDefinition> mappings = new HashMap<String, SimpleVMServiceDefinition>();
 	
 	public Workflow(String id, ResourceContainer<?> directory, Repository repository) {
 		super(id, directory, repository, "workflow.xml", WorkflowConfiguration.class);
@@ -78,35 +99,39 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Def
 						
 						List<TransitionInstance> transitions = workflowManager.getTransitions(workflow.getId());
 						Collections.sort(transitions);
-						TransitionInstance running = null;
-						for (TransitionInstance transition : transitions) {
-							if (transition.getTransitionState().equals(Level.RUNNING)) {
-								running = transition;
-								break;
-							}
-						}
-						if (running != null) {
+						TransitionInstance last = transitions.get(transitions.size() - 1);
+						if (last.getTransitionState().equals(Level.RUNNING)) {
 							// revert the original transition
-							running.setTransitionState(Level.REVERTED);
-							running.setStopped(new Date());
-							workflowManager.updateTransition(transactionId, running);
-							
-							// find nearest successful transition that ended in a stateless state, we can go from there
-							TransitionInstance statelessParent = null;
-							for (TransitionInstance transition : transitions) {
-								if (transition.getTransitionState().equals(Level.SUCCEEDED)) {
-									WorkflowTransition definition = getTransitionById(transition.getDefinitionId());
-									if (definition.getTargetState() != null && definition.getTargetState().isStateless()) {
-										statelessParent = transition;
-									}
+							last.setTransitionState(Level.REVERTED);
+							last.setStopped(new Date());
+							workflowManager.updateTransition(transactionId, last);
+						}
+						// find nearest successful transition that ended in a stateless state, we can go from there
+						TransitionInstance statelessParent = null;
+						for (TransitionInstance transition : transitions) {
+							if (transition.getTransitionState().equals(Level.SUCCEEDED)) {
+								WorkflowTransition definition = getTransitionById(transition.getDefinitionId());
+								if (definition.getTargetState() != null && definition.getTargetState().isStateless()) {
+									statelessParent = transition;
 								}
 							}
-							// if we have a stateless parent, build a new transition from there
-							if (statelessParent != null) {
+						}
+						// if we have a stateless parent, build a new transition from there
+						if (statelessParent != null) {
+							int nextSequence = transitions.get(transitions.size() - 1).getSequence() + 1;
+							// if it is the last transition
+							if (transitions.indexOf(statelessParent) == transitions.size() - 1) {
+								WorkflowTransition transitionDefinition = getTransitionById(statelessParent.getDefinitionId());
+								// and it's an automatic, run it
+								if (transitionDefinition.getTargetState().getTransitionPicker() != null) {
+									run(workflow, getAsTransitionPicker(transitionDefinition.getTargetState().getTransitionPicker()), SystemPrincipal.ROOT, nextSequence, statelessParent, null);
+								}
+							}
+							else {
 								// we first need the next transition attempted, so we know how the workflow was supposed to go
 								TransitionInstance nextTransition = getTransitionBySequence(transitions, statelessParent.getSequence() + 1);
 								WorkflowTransition transitionDefinition = getTransitionById(nextTransition.getDefinitionId());
-								run(workflow, transitionDefinition);
+								run(workflow, transitionDefinition, SystemPrincipal.ROOT, nextSequence, statelessParent, null);
 							}
 						}
 						// commit the transaction
@@ -127,8 +152,136 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Def
 		}
 	}
 	
-	public static void run(WorkflowInstance workflow, WorkflowTransition transition) {
-		// TODO: execute the transition on the workflow
+	public TransitionPicker getAsTransitionPicker(DefinedService service) {
+		return service == null ? null : POJOUtils.newProxy(TransitionPicker.class, getRepository(), SystemPrincipal.ROOT, service);
+	}
+	
+	public void run(WorkflowInstance workflow, TransitionPicker picker, Principal principal, int sequence, TransitionInstance previousTransition, ComplexContent previousTransitionOutput) {
+		
+	}
+	
+	public void run(WorkflowInstance workflow, WorkflowTransition transition, Principal principal, int sequence, TransitionInstance previousTransition, ComplexContent previousTransitionOutput) throws IOException {
+		ComplexContent input, output;
+		
+		// we create the transition entry
+		TransitionInstance newInstance = new TransitionInstance();
+		if (principal != null) {
+			newInstance.setActorId(principal.getName());
+		}
+		newInstance.setId(UUID.randomUUID().toString());
+		newInstance.setDefinitionId(transition.getId());
+		if (previousTransition != null) {
+			newInstance.setParentId(previousTransition.getId());
+		}
+		newInstance.setSequence(sequence);
+		newInstance.setStarted(new Date());
+		newInstance.setSystemId(getRepository().getName());
+		newInstance.setTransitionState(Level.RUNNING);
+		newInstance.setWorkflowId(workflow.getId());
+		
+		String transactionId = UUID.randomUUID().toString();
+		try {
+			getConfiguration().getProvider().getWorkflowManager().createTransition(transactionId, newInstance);
+			WorkflowProvider.executionContext.get().getTransactionContext().commit(transactionId);
+		}
+		catch (Exception e) {
+			WorkflowProvider.executionContext.get().getTransactionContext().rollback(transactionId);
+		}
+		finally {
+			WorkflowProvider.executionContext.set(null);
+		}
+		
+		try {
+			// we execute the mapping service for this entry if any
+			SimpleVMServiceDefinition mapping = getMappings().get(transition.getId());
+			if (mapping != null) {
+				List<WorkflowProperty> workflowProperties = getConfiguration().getProvider().getWorkflowManager().getWorkflowProperties(workflow.getId());
+				ComplexContent mapInput = mapping.getServiceInterface().getInputDefinition().newInstance();
+				mapInput.set("workflow", workflow);
+				mapInput.set("properties", workflowProperties);
+				// we map in the output of the previous transitioner
+				if (previousTransitionOutput != null) {
+					WorkflowTransition transitionById = getTransitionById(previousTransition.getDefinitionId());
+					if (transitionById != null) {
+						mapInput.set(EAIRepositoryUtils.stringToField(transitionById.getName()), previousTransitionOutput);
+					}
+				}
+				ServiceRuntime serviceRuntime = new ServiceRuntime(transition.getService(), getRepository().newExecutionContext(principal));
+				input = serviceRuntime.run(mapInput);
+			}
+			else {
+				input = transition.getService().getServiceInterface().getInputDefinition().newInstance();
+			}
+			// we execute the actual transition service
+			ServiceRuntime runtime = new ServiceRuntime(transition.getService(), getRepository().newExecutionContext(principal));
+			output = runtime.run(input);
+
+			List<WorkflowProperty> propertiesToUpdate = new ArrayList<WorkflowProperty>();
+			List<WorkflowProperty> propertiesToCreate = new ArrayList<WorkflowProperty>();
+			if (transition.getFieldsToStore() != null) {
+				
+				for (String fieldToStore : transition.getFieldsToStore()) {
+					// TODO: perform stores where necessary
+					// merge intelligently with properties
+				}
+			}
+			
+			transactionId = UUID.randomUUID().toString();
+			try {
+				newInstance.setTransitionState(Level.SUCCEEDED);
+				newInstance.setStopped(new Date());
+				getConfiguration().getProvider().getWorkflowManager().updateTransition(transactionId, newInstance);
+				// if there are no further paths, update workflow as well
+				if (transition.getTargetState().getTransitions() == null || transition.getTargetState().getTransitions().isEmpty()) {
+					workflow.setTransitionState(Level.SUCCEEDED);
+					getConfiguration().getProvider().getWorkflowManager().updateWorkflow(transactionId, workflow);
+				}
+				// TODO: create/update the workflow properties!
+				
+				WorkflowProvider.executionContext.get().getTransactionContext().commit(transactionId);
+			}
+			catch (Exception e) {
+				WorkflowProvider.executionContext.get().getTransactionContext().rollback(transactionId);
+				logger.error("Could not update transition to succeeded", e);
+				throw new RuntimeException(e);
+			}
+			finally {
+				WorkflowProvider.executionContext.set(null);
+			}
+		}
+		catch (Exception e) {
+			transactionId = UUID.randomUUID().toString();
+			try {
+				newInstance.setTransitionState(Level.FAILED);
+				newInstance.setStopped(new Date());
+				StringWriter writer = new StringWriter();
+				PrintWriter printer = new PrintWriter(writer);
+				e.printStackTrace(printer);
+				printer.flush();
+				newInstance.setErrorLog(writer.toString());
+				if (e instanceof ServiceException) {
+					newInstance.setErrorCode(((ServiceException) e).getCode());
+				}
+				getConfiguration().getProvider().getWorkflowManager().updateTransition(transactionId, newInstance);
+				workflow.setTransitionState(Level.FAILED);
+				getConfiguration().getProvider().getWorkflowManager().updateWorkflow(transactionId, workflow);
+				WorkflowProvider.executionContext.get().getTransactionContext().commit(transactionId);
+			}
+			catch (Exception f) {
+				WorkflowProvider.executionContext.get().getTransactionContext().rollback(transactionId);
+				logger.error("Could not update transition to failed", f);
+				logger.error("Cause of failure", e);
+			}
+			finally {
+				WorkflowProvider.executionContext.set(null);
+			}
+			throw new RuntimeException(e);
+		}
+		
+		// continue execution
+		if (transition.getTargetState().getTransitions() != null && !transition.getTargetState().getTransitions().isEmpty() && transition.getTargetState().getTransitionPicker() != null) {
+			run(workflow, getAsTransitionPicker(transition.getTargetState().getTransitionPicker()), principal, sequence + 1, newInstance, output);
+		}
 	}
 	
 	public static TransitionInstance getTransitionBySequence(List<TransitionInstance> instances, int sequence) {
@@ -208,4 +361,9 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Def
 	public boolean isStarted() {
 		return started;
 	}
+
+	public Map<String, SimpleVMServiceDefinition> getMappings() {
+		return mappings;
+	}
+	
 }
