@@ -1,5 +1,6 @@
 package be.nabu.eai.module.workflow;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import be.nabu.libs.services.api.DefinedService;
@@ -51,6 +52,9 @@ public class WorkflowState {
 		this.stateless = stateless;
 	}
 	public List<WorkflowTransition> getTransitions() {
+		if (transitions == null) {
+			transitions = new ArrayList<WorkflowTransition>();
+		}
 		return transitions;
 	}
 	public void setTransitions(List<WorkflowTransition> transitions) {

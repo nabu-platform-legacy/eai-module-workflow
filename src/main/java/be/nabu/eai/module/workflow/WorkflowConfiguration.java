@@ -1,5 +1,6 @@
 package be.nabu.eai.module.workflow;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import javax.validation.constraints.NotNull;
@@ -18,6 +19,9 @@ public class WorkflowConfiguration {
 	private DefinedService permissionService, roleService, tokenValidatorService;
 	
 	public List<WorkflowTransition> getInitialTransitions() {
+		if (initialTransitions == null) {
+			initialTransitions = new ArrayList<WorkflowTransition>();
+		}
 		return initialTransitions;
 	}
 	public void setInitialTransitions(List<WorkflowTransition> initialTransitions) {
@@ -34,6 +38,9 @@ public class WorkflowConfiguration {
 	}
 	
 	public List<WorkflowState> getStates() {
+		if (states == null) {
+			states = new ArrayList<WorkflowState>();
+		}
 		return states;
 	}
 	public void setStates(List<WorkflowState> states) {
