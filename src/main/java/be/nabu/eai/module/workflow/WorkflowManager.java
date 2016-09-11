@@ -3,6 +3,7 @@ package be.nabu.eai.module.workflow;
 import java.io.IOException;
 import java.text.ParseException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 
@@ -16,9 +17,13 @@ import be.nabu.eai.repository.api.Entry;
 import be.nabu.eai.repository.api.ModifiableEntry;
 import be.nabu.eai.repository.api.Repository;
 import be.nabu.eai.repository.api.ResourceEntry;
+import be.nabu.eai.repository.api.ResourceRepository;
 import be.nabu.eai.repository.artifacts.container.ContainerArtifactManager.WrapperEntry;
+import be.nabu.eai.repository.artifacts.container.ContainerArtifactManager.ContainerRepository;
 import be.nabu.eai.repository.managers.base.JAXBArtifactManager;
 import be.nabu.eai.repository.resources.MemoryEntry;
+import be.nabu.eai.repository.resources.RepositoryEntry;
+import be.nabu.libs.artifacts.api.Artifact;
 import be.nabu.libs.resources.api.ManageableContainer;
 import be.nabu.libs.resources.api.Resource;
 import be.nabu.libs.resources.api.ResourceContainer;
@@ -37,26 +42,41 @@ public class WorkflowManager extends JAXBArtifactManager<WorkflowConfiguration, 
 		return new Workflow(id, container, repository);
 	}
 
+	@SuppressWarnings({ "unchecked", "rawtypes" })
 	@Override
 	public Workflow load(ResourceEntry entry, List<Validation<?>> messages) throws IOException, ParseException {
 		Workflow workflow = super.load(entry, messages);
 		ResourceContainer<?> privateDirectory = (ResourceContainer<?>) entry.getContainer().getChild(EAIResourceRepository.PRIVATE);
 		if (privateDirectory != null) {
-			ResourceContainer<?> services = (ResourceContainer<?>) privateDirectory.getChild("services");
-			if (services != null) {
-				for (Resource child : (ResourceContainer<?>) services) {
-					VMService loaded = new VMServiceManager().load(new WrapperEntry(entry.getRepository(), entry, (ResourceContainer<?>) child, child.getName()), messages);
-					workflow.getMappings().put(child.getName(), loaded);
-				}
-			}
 			ResourceContainer<?> structures = (ResourceContainer<?>) privateDirectory.getChild("structures");
 			if (structures != null) {
 				for (Resource child : (ResourceContainer<?>) structures) {
 					DefinedStructure loaded = new StructureManager().load(new WrapperEntry(entry.getRepository(), entry, (ResourceContainer<?>) child, child.getName()), messages);
+					loaded.setId(entry.getId() + ".state." + (child.getName().equals("global") ? "global" : EAIRepositoryUtils.stringToField(workflow.getStateById(child.getName()).getName())));
 					workflow.getStructures().put(child.getName(), loaded);
 				}
 			}
+			// Tricky stuff: the services that do the mapping are based on the documents we dynamically add to state
+			ContainerRepository containerRepository = new ContainerRepository(entry.getId(), (RepositoryEntry) entry, (Collection<Artifact>) (Collection) workflow.getStructures().values());
+			for (DefinedStructure structure : workflow.getStructures().values()) {
+				containerRepository.alias(entry.getId() + ":" + structure.getId(), structure.getId());
+			}
+			// so we can only load them after the documents are added to the tree
+			ResourceContainer<?> services = (ResourceContainer<?>) privateDirectory.getChild("services");
+			if (services != null) {
+				for (Resource child : (ResourceContainer<?>) services) {
+					VMService loaded;
+					try {
+						loaded = new VMServiceManager().load(new WrapperEntry(containerRepository, entry, (ResourceContainer<?>) child, child.getName()), messages);
+					}
+					catch (Exception e) {
+						throw new RuntimeException(e);
+					}
+					workflow.getMappings().put(child.getName(), loaded);
+				}
+			}
 		}
+		
 		return workflow;
 	}
 
@@ -89,9 +109,14 @@ public class WorkflowManager extends JAXBArtifactManager<WorkflowConfiguration, 
 		}
 		return messages;
 	}
+	
+	public void refreshChildren(ModifiableEntry parent, Workflow artifact) {
+		removeChildren((ModifiableEntry) parent, artifact);
+		addChildren((ModifiableEntry) parent, artifact);
+	}
 
 	@Override
-	public List<Entry> addChildren(ModifiableEntry parent, Workflow artifact) throws IOException {
+	public List<Entry> addChildren(ModifiableEntry parent, Workflow artifact) {
 		List<Entry> entries = new ArrayList<Entry>();
 		// add the state structures
 		ModifiableEntry structures = EAIRepositoryUtils.getParent(parent, "state", true);
@@ -122,13 +147,15 @@ public class WorkflowManager extends JAXBArtifactManager<WorkflowConfiguration, 
 	}
 
 	@Override
-	public List<Entry> removeChildren(ModifiableEntry parent, Workflow artifact) throws IOException {
+	public List<Entry> removeChildren(ModifiableEntry parent, Workflow artifact) {
 		List<Entry> entries = new ArrayList<Entry>();
 		ModifiableEntry structures = EAIRepositoryUtils.getParent(parent, "state", true);
 		Iterator<Entry> iterator = structures.iterator();
 		while (iterator.hasNext()) {
 			entries.add(iterator.next());
-			iterator.remove();
+		}
+		for (Entry toRemove : entries) {
+			structures.removeChildren(toRemove.getName());
 		}
 		return entries;
 	}

@@ -32,10 +32,11 @@ import javafx.scene.input.MouseEvent;
 import javafx.scene.input.TransferMode;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Pane;
 import javafx.scene.layout.VBox;
 import javafx.scene.shape.Circle;
-import javafx.scene.shape.Shape;
 import be.nabu.eai.developer.MainController;
+import be.nabu.eai.developer.controllers.VMServiceController;
 import be.nabu.eai.developer.managers.base.BaseArtifactGUIInstance;
 import be.nabu.eai.developer.managers.base.BasePortableGUIManager;
 import be.nabu.eai.developer.managers.util.MovablePane;
@@ -43,16 +44,28 @@ import be.nabu.eai.developer.managers.util.SimpleProperty;
 import be.nabu.eai.developer.managers.util.SimplePropertyUpdater;
 import be.nabu.eai.developer.util.EAIDeveloperUtils;
 import be.nabu.eai.module.services.vm.VMServiceGUIManager;
+import be.nabu.eai.module.types.structure.StructureGUIManager;
 import be.nabu.eai.module.workflow.gui.RectangleWithHooks;
+import be.nabu.eai.repository.EAIRepositoryUtils;
 import be.nabu.eai.repository.api.Entry;
+import be.nabu.eai.repository.api.ModifiableEntry;
 import be.nabu.eai.repository.api.ResourceEntry;
 import be.nabu.eai.repository.resources.RepositoryEntry;
 import be.nabu.jfx.control.line.Line;
+import be.nabu.jfx.control.tree.TreeItem;
 import be.nabu.jfx.control.tree.drag.MouseLocation;
 import be.nabu.jfx.control.tree.drag.TreeDragDrop;
 import be.nabu.libs.property.api.Property;
 import be.nabu.libs.property.api.Value;
+import be.nabu.libs.services.vm.Pipeline;
+import be.nabu.libs.services.vm.SimpleVMServiceDefinition;
+import be.nabu.libs.services.vm.api.Step;
+import be.nabu.libs.services.vm.api.VMService;
+import be.nabu.libs.services.vm.step.Sequence;
+import be.nabu.libs.types.api.ComplexType;
+import be.nabu.libs.types.base.ComplexElementImpl;
 import be.nabu.libs.types.structure.DefinedStructure;
+import be.nabu.libs.types.structure.Structure;
 import be.nabu.libs.validator.api.ValidationMessage;
 import be.nabu.libs.validator.api.ValidationMessage.Severity;
 
@@ -69,6 +82,7 @@ public class WorkflowGUIManager extends BasePortableGUIManager<Workflow, BaseArt
 	private Map<String, List<Node>> transitions = new HashMap<String, List<Node>>();
 	private AnchorPane drawPane;
 	private Line draggingLine;
+	private AnchorPane mapPane;
 	
 	public WorkflowGUIManager() {
 		super("Workflow", Workflow.class, new WorkflowManager());
@@ -126,6 +140,7 @@ public class WorkflowGUIManager extends BasePortableGUIManager<Workflow, BaseArt
 							DefinedStructure value = new DefinedStructure();
 							value.setName("transient");
 							artifact.getStructures().put(state.getId(), value);
+							((WorkflowManager) getArtifactManager()).refreshChildren((ModifiableEntry) artifact.getRepository().getEntry(artifact.getId()), artifact);
 							drawState(artifact, state);
 							MainController.getInstance().setChanged();
 						}
@@ -138,8 +153,7 @@ public class WorkflowGUIManager extends BasePortableGUIManager<Workflow, BaseArt
 		
 		vbox.getChildren().addAll(buttons, drawPane);
 		
-		// contains the transition mapping
-		AnchorPane mapPane = new AnchorPane();
+		mapPane = new AnchorPane();
 		
 		split.getItems().addAll(vbox, mapPane);
 		
@@ -177,6 +191,15 @@ public class WorkflowGUIManager extends BasePortableGUIManager<Workflow, BaseArt
 		rectangle.getContent().addEventHandler(MouseEvent.MOUSE_CLICKED, new EventHandler<MouseEvent>() {
 			@Override
 			public void handle(MouseEvent arg0) {
+				mapPane.getChildren().clear();
+				// add an editor for the transient state
+				try {
+					new StructureGUIManager().display(MainController.getInstance(), mapPane, workflow.getStructures().get(state.getId()));
+				}
+				catch (Exception e) {
+					throw new RuntimeException(e);
+				}
+				// focus on the state for deletion if necessary
 				rectangle.getContent().requestFocus();
 			}
 		});
@@ -259,6 +282,24 @@ public class WorkflowGUIManager extends BasePortableGUIManager<Workflow, BaseArt
 										child.getTransitions().add(transition);
 										transition.setX(state.getX() + ((child.getX() - state.getX()) / 2));
 										transition.setY(state.getY());
+										Structure input = new Structure();
+										input.setName("input");
+										input.add(new ComplexElementImpl("global", (ComplexType) workflow.getRepository().resolve(workflow.getId() + ".state.global"), input));
+										input.add(new ComplexElementImpl("transient", (ComplexType) workflow.getRepository().resolve(workflow.getId() + ".state." + EAIRepositoryUtils.stringToField(child.getName())), input));
+										
+										Structure output = new Structure();
+										output.setName("output");
+										output.add(new ComplexElementImpl("global", (ComplexType) workflow.getRepository().resolve(workflow.getId() + ".state.global"), output));
+										output.add(new ComplexElementImpl("transient", (ComplexType) workflow.getRepository().resolve(workflow.getId() + ".state." + EAIRepositoryUtils.stringToField(state.getName())), output));
+										
+										Pipeline pipeline = new Pipeline(input, output);
+										SimpleVMServiceDefinition service = new SimpleVMServiceDefinition(pipeline);
+										service.setRoot(new Sequence());
+										be.nabu.libs.services.vm.step.Map map = new be.nabu.libs.services.vm.step.Map();
+										map.setParent(service.getRoot());
+										service.getRoot().getChildren().add(map);
+										
+										workflow.getMappings().put(transition.getId(), service);
 										drawTransition(workflow, child, transition);
 									}
 								}
@@ -313,6 +354,33 @@ public class WorkflowGUIManager extends BasePortableGUIManager<Workflow, BaseArt
 		pane.setLayoutX(transition.getX());
 		pane.setLayoutY(transition.getY());
 		shapes.add(pane);
+		
+		circle.addEventHandler(MouseEvent.MOUSE_CLICKED, new EventHandler<MouseEvent>() {
+			@Override
+			public void handle(MouseEvent arg0) {
+				AnchorPane pane = new AnchorPane();
+				try {
+					VMServiceGUIManager serviceManager = new VMServiceGUIManager();
+					VMService service = workflow.getMappings().get(transition.getId());
+					System.out.println("SERVICE = " + service + " / " + transition.getId() + " / " + workflow.getMappings());
+					VMServiceController controller = serviceManager.displayWithController(MainController.getInstance(), pane, service);
+					TreeItem<Step> root = serviceManager.getServiceTree().rootProperty().get();
+					TreeItem<Step> treeItem = root.getChildren().get(0);
+					serviceManager.getServiceTree().getSelectionModel().select(serviceManager.getServiceTree().getTreeCell(treeItem));
+					Pane panMap = controller.getPanMap();
+					mapPane.getChildren().clear();
+					mapPane.getChildren().add(panMap);
+					
+					AnchorPane.setBottomAnchor(panMap, 0d);
+					AnchorPane.setTopAnchor(panMap, 0d);
+					AnchorPane.setRightAnchor(panMap, 0d);
+					AnchorPane.setLeftAnchor(panMap, 0d);
+				}
+				catch (Exception e) {
+					throw new RuntimeException(e);
+				}
+			}
+		});
 		
 		MovablePane movableCircle = MovablePane.makeMovable(pane);
 		movableCircle.xProperty().addListener(new ChangeListener<Number>() {
