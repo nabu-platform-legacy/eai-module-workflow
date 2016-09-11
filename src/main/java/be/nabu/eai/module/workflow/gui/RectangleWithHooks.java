@@ -53,17 +53,17 @@ public class RectangleWithHooks {
 		
 		container.getChildren().add(this.content);
 				
-		topAnchorX.bind(container.layoutXProperty().add(container.widthProperty().divide(2)));
+		topAnchorX.bind(container.layoutXProperty().add(content.widthProperty().divide(2)));
 		topAnchorY.bind(container.layoutYProperty());
 		
-		rightAnchorX.bind(container.layoutXProperty().add(container.widthProperty()));
-		rightAnchorY.bind(container.layoutYProperty().add(container.heightProperty().divide(2)));
+		rightAnchorX.bind(container.layoutXProperty().add(content.widthProperty()));
+		rightAnchorY.bind(container.layoutYProperty().add(content.heightProperty().divide(2)));
 		
-		bottomAnchorX.bind(container.layoutXProperty().add(container.widthProperty().divide(2)));
-		bottomAnchorY.bind(container.layoutYProperty().add(container.heightProperty()));
+		bottomAnchorX.bind(container.layoutXProperty().add(content.widthProperty().divide(2)));
+		bottomAnchorY.bind(container.layoutYProperty().add(content.heightProperty()));
 		
 		leftAnchorX.bind(container.layoutXProperty());
-		leftAnchorY.bind(container.layoutYProperty().add(container.heightProperty().divide(2)));
+		leftAnchorY.bind(container.layoutYProperty().add(content.heightProperty().divide(2)));
 	}
 	
 	public ReadOnlyDoubleProperty topAnchorXProperty() {
