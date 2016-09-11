@@ -3,6 +3,7 @@ package be.nabu.eai.module.workflow;
 import java.io.IOException;
 import java.net.URL;
 import java.text.ParseException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -17,6 +18,7 @@ import javafx.beans.value.ObservableValue;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
 import javafx.geometry.Orientation;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
@@ -31,6 +33,8 @@ import javafx.scene.input.TransferMode;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
+import javafx.scene.shape.Circle;
+import javafx.scene.shape.Shape;
 import be.nabu.eai.developer.MainController;
 import be.nabu.eai.developer.managers.base.BaseArtifactGUIInstance;
 import be.nabu.eai.developer.managers.base.BasePortableGUIManager;
@@ -48,6 +52,7 @@ import be.nabu.jfx.control.tree.drag.MouseLocation;
 import be.nabu.jfx.control.tree.drag.TreeDragDrop;
 import be.nabu.libs.property.api.Property;
 import be.nabu.libs.property.api.Value;
+import be.nabu.libs.types.structure.DefinedStructure;
 import be.nabu.libs.validator.api.ValidationMessage;
 import be.nabu.libs.validator.api.ValidationMessage.Severity;
 
@@ -61,7 +66,7 @@ public class WorkflowGUIManager extends BasePortableGUIManager<Workflow, BaseArt
 	}
 	
 	private Map<String, RectangleWithHooks> states = new HashMap<String, RectangleWithHooks>();
-	private Map<String, Line> transitions = new HashMap<String, Line>();
+	private Map<String, List<Node>> transitions = new HashMap<String, List<Node>>();
 	private AnchorPane drawPane;
 	private Line draggingLine;
 	
@@ -118,6 +123,9 @@ public class WorkflowGUIManager extends BasePortableGUIManager<Workflow, BaseArt
 							state.setId(UUID.randomUUID().toString());
 							state.setName(name);
 							artifact.getConfig().getStates().add(state);
+							DefinedStructure value = new DefinedStructure();
+							value.setName("transient");
+							artifact.getStructures().put(state.getId(), value);
 							drawState(artifact, state);
 							MainController.getInstance().setChanged();
 						}
@@ -166,6 +174,38 @@ public class WorkflowGUIManager extends BasePortableGUIManager<Workflow, BaseArt
 		});
 		
 		Scene scene = MainController.getInstance().getStage().getScene();
+		rectangle.getContent().addEventHandler(MouseEvent.MOUSE_CLICKED, new EventHandler<MouseEvent>() {
+			@Override
+			public void handle(MouseEvent arg0) {
+				rectangle.getContent().requestFocus();
+			}
+		});
+		rectangle.getContent().addEventHandler(KeyEvent.KEY_PRESSED, new EventHandler<KeyEvent>() {
+			@Override
+			public void handle(KeyEvent event) {
+				if (event.getCode() == KeyCode.DELETE) {
+					// remove all transitions that reach this state
+					for (WorkflowState child : workflow.getConfig().getStates()) {
+						Iterator<WorkflowTransition> iterator = child.getTransitions().iterator();
+						while (iterator.hasNext()) {
+							WorkflowTransition next = iterator.next();
+							if (state.getId().equals(next.getTargetStateId())) {
+								iterator.remove();
+								// the transition goes to the state-to-be-removed
+								removeTransition(workflow, child, next);
+							}
+						}
+					}
+					drawPane.getChildren().remove(states.get(state.getId()).getContainer());
+					states.remove(state.getId());
+					// remove the state
+					workflow.getConfig().getStates().remove(state);
+					// remove the structure associated with the transiens state (if any)
+					workflow.getStructures().remove(state.getId());
+					MainController.getInstance().setChanged();
+				}
+			}
+		});
 		rectangle.getContent().addEventHandler(MouseEvent.DRAG_DETECTED, new EventHandler<MouseEvent>() {
 			@Override
 			public void handle(MouseEvent event) {
@@ -214,10 +254,12 @@ public class WorkflowGUIManager extends BasePortableGUIManager<Workflow, BaseArt
 								transition.setId(UUID.randomUUID().toString());
 								transition.setTargetStateId(state.getId());
 								transition.setName(name);
-								for (WorkflowState state : workflow.getConfig().getStates()) {
-									if (state.getId().equals(content)) {
-										state.getTransitions().add(transition);
-										drawTransition(workflow, state, transition);
+								for (WorkflowState child : workflow.getConfig().getStates()) {
+									if (child.getId().equals(content)) {
+										child.getTransitions().add(transition);
+										transition.setX(state.getX() + ((child.getX() - state.getX()) / 2));
+										transition.setY(state.getY());
+										drawTransition(workflow, child, transition);
 									}
 								}
 								MainController.getInstance().setChanged();
@@ -243,41 +285,102 @@ public class WorkflowGUIManager extends BasePortableGUIManager<Workflow, BaseArt
 			}
 		});
 		
-		
 		drawPane.getChildren().add(rectangle.getContainer());
 		// TODO: on click > show properties of state on the right side
 		states.put(state.getId(), rectangle);
 	}
 	
+	private void removeTransition(final Workflow workflow, final WorkflowState state, final WorkflowTransition transition) {
+		if (transitions.containsKey(transition.getId())) {
+			drawPane.getChildren().removeAll(transitions.get(transition.getId()));
+			transitions.remove(transition.getId());
+		}
+		state.getTransitions().remove(transition);
+		workflow.getMappings().remove(transition.getId());
+		MainController.getInstance().setChanged();
+	}
+	
 	private void drawTransition(final Workflow workflow, final WorkflowState state, final WorkflowTransition transition) {
-		Line line = new Line();
-		line.eventSizeProperty().set(10);
+		List<Node> shapes = new ArrayList<Node>();
+		
+		AnchorPane pane = new AnchorPane();
+		VBox box = new VBox();
+		Circle circle = new Circle(10);
+		circle.getStyleClass().add("connectionLine");
+		box.getChildren().addAll(circle, new Label(transition.getName()));
+		pane.getChildren().add(box);
+		pane.setManaged(false);
+		pane.setLayoutX(transition.getX());
+		pane.setLayoutY(transition.getY());
+		shapes.add(pane);
+		
+		MovablePane movableCircle = MovablePane.makeMovable(pane);
+		movableCircle.xProperty().addListener(new ChangeListener<Number>() {
+			@Override
+			public void changed(ObservableValue<? extends Number> arg0, Number arg1, Number arg2) {
+				transition.setX(arg2.doubleValue());
+				MainController.getInstance().setChanged();
+			}
+		});
+		movableCircle.yProperty().addListener(new ChangeListener<Number>() {
+			@Override
+			public void changed(ObservableValue<? extends Number> arg0, Number arg1, Number arg2) {
+				transition.setY(arg2.doubleValue());
+				MainController.getInstance().setChanged();
+			}
+		});
+		
+		Line line1 = new Line();
+		line1.eventSizeProperty().set(5);
 		// the line starts at the outgoing point of the state
-		line.startXProperty().bind(states.get(state.getId()).rightAnchorXProperty());
-		line.startYProperty().bind(states.get(state.getId()).rightAnchorYProperty());
-		line.endXProperty().bind(states.get(transition.getTargetStateId()).leftAnchorXProperty());
-		line.endYProperty().bind(states.get(transition.getTargetStateId()).leftAnchorYProperty());
+		line1.startXProperty().bind(states.get(state.getId()).rightAnchorXProperty());
+		line1.startYProperty().bind(states.get(state.getId()).rightAnchorYProperty());
+		line1.endXProperty().bind(pane.layoutXProperty());
+		line1.endYProperty().bind(pane.layoutYProperty().add(circle.layoutYProperty()).add(circle.centerYProperty()));
+		
 		// TODO: draw all transitions, add click handlers etc
-		line.addEventHandler(KeyEvent.KEY_PRESSED, new EventHandler<KeyEvent>() {
+		line1.addEventHandler(KeyEvent.KEY_PRESSED, new EventHandler<KeyEvent>() {
 			@Override
 			public void handle(KeyEvent event) {
 				if (event.getCode() == KeyCode.DELETE) {
-					state.getTransitions().remove(transition);
-					drawPane.getChildren().remove(line);
-					workflow.getMappings().remove(transition.getId());
-					MainController.getInstance().setChanged();
+					removeTransition(workflow, state, transition);
 				}
 			}
 		});
-		line.addEventHandler(MouseEvent.MOUSE_CLICKED, new EventHandler<MouseEvent>() {
+		line1.addEventHandler(MouseEvent.MOUSE_CLICKED, new EventHandler<MouseEvent>() {
 			@Override
 			public void handle(MouseEvent event) {
-				line.requestFocus();
+				line1.requestFocus();
 			}
 		});
-		line.getStyleClass().add("connectionLine");
-		transitions.put(transition.getId(), line);
-		drawPane.getChildren().add(line);
+		line1.getStyleClass().add("connectionLine");
+		
+		Line line2 = new Line();
+		line2.eventSizeProperty().set(5);
+		line2.startXProperty().bind(pane.layoutXProperty().add(pane.widthProperty()));
+		line2.startYProperty().bind(pane.layoutYProperty().add(circle.layoutYProperty()).add(circle.centerYProperty()));
+		line2.endXProperty().bind(states.get(transition.getTargetStateId()).leftAnchorXProperty());
+		line2.endYProperty().bind(states.get(transition.getTargetStateId()).leftAnchorYProperty());
+		line2.addEventHandler(KeyEvent.KEY_PRESSED, new EventHandler<KeyEvent>() {
+			@Override
+			public void handle(KeyEvent event) {
+				if (event.getCode() == KeyCode.DELETE) {
+					removeTransition(workflow, state, transition);
+				}
+			}
+		});
+		line2.addEventHandler(MouseEvent.MOUSE_CLICKED, new EventHandler<MouseEvent>() {
+			@Override
+			public void handle(MouseEvent event) {
+				line2.requestFocus();
+			}
+		});
+		line2.getStyleClass().add("connectionLine");
+		
+		shapes.add(line1);
+		shapes.add(line2);
+		transitions.put(transition.getId(), shapes);
+		drawPane.getChildren().addAll(line1, line2, pane);
 	}
 
 	@Override

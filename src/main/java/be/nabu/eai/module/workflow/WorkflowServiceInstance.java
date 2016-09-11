@@ -23,7 +23,8 @@ public class WorkflowServiceInstance implements ServiceInstance {
 	
 	@Override
 	public Service getDefinition() {
-		return workflow;
+//		return workflow;
+		return null;
 	}
 
 	@Override
@@ -53,21 +54,22 @@ public class WorkflowServiceInstance implements ServiceInstance {
 		}
 		
 		try {
-			for (WorkflowTransition transition : workflow.getConfiguration().getInitialTransitions()) {
-				Object object = input.get(EAIRepositoryUtils.stringToField(transition.getName()));
-				if (object != null) {
-					workflow.run(instance, transition, executionContext.getSecurityContext().getPrincipal(), 0, null, null);
-					break;
-				}
-			}
+//			for (WorkflowTransition transition : workflow.getConfiguration().getInitialTransitions()) {
+//				Object object = input.get(EAIRepositoryUtils.stringToField(transition.getName()));
+//				if (object != null) {
+//					workflow.run(instance, transition, executionContext.getSecurityContext().getPrincipal(), 0, null, null);
+//					break;
+//				}
+//			}
 		}
 		catch (Exception e) {
 			throw new ServiceException(e);
 		}
 		
-		ComplexContent output = workflow.getServiceInterface().getOutputDefinition().newInstance();
-		output.set("workflow", instance);
-		return output;
+//		ComplexContent output = workflow.getServiceInterface().getOutputDefinition().newInstance();
+//		output.set("workflow", instance);
+//		return output;
+		return null;
 	}
 
 }

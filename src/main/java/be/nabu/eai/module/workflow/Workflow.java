@@ -49,6 +49,7 @@ import be.nabu.libs.types.base.SimpleElementImpl;
 import be.nabu.libs.types.base.ValueImpl;
 import be.nabu.libs.types.java.BeanResolver;
 import be.nabu.libs.types.properties.MinOccursProperty;
+import be.nabu.libs.types.structure.DefinedStructure;
 import be.nabu.libs.types.structure.Structure;
 
 // expose folders for each state with transition methods (input extends actual transition service input + workflow instance id)
@@ -61,7 +62,7 @@ import be.nabu.libs.types.structure.Structure;
 // can also retry from a chosen stateless state _that the workflow passed through_
 
 // TODO: add security checks for transitions
-public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements DefinedService, StartableArtifact {
+public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements StartableArtifact {
 
 	private boolean started;
 	
@@ -70,93 +71,16 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Def
 	private Map<String, TypeOperation> analyzedOperations = new HashMap<String, TypeOperation>();
 	private Map<String, WorkflowTransition> transitions = new HashMap<String, WorkflowTransition>();
 	private Map<String, WorkflowState> states = new HashMap<String, WorkflowState>();
+	// one mapping per transition
 	private Map<String, VMService> mappings = new HashMap<String, VMService>();
-
-	private WorkflowInterface workflowInterface;
 	
+	private Map<String, DefinedStructure> structures = new HashMap<String, DefinedStructure>();
+
 	public Workflow(String id, ResourceContainer<?> directory, Repository repository) {
 		super(id, directory, repository, "workflow.xml", WorkflowConfiguration.class);
-	}
-
-	@Override
-	public ServiceInterface getServiceInterface() {
-		if (workflowInterface == null) {
-			synchronized(this) {
-				if (workflowInterface == null) {
-					workflowInterface = new WorkflowInterface(this);
-				}
-			}
-		}
-		return workflowInterface;
-	}
-	
-	public static class WorkflowInterface implements ServiceInterface {
-
-		private Workflow flow;
-		private Structure input, output;
-
-		public WorkflowInterface(Workflow flow) {
-			this.flow = flow;
-		}
-		
-		@Override
-		public ComplexType getInputDefinition() {
-			if (input == null) {
-				synchronized(this) {
-					if (input == null) {
-						Structure input = new Structure();
-						try {
-							input.add(new SimpleElementImpl<String>("batchId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
-							input.add(new SimpleElementImpl<String>("contextId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
-							input.add(new SimpleElementImpl<String>("parentId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
-							for (WorkflowTransition transition : flow.getConfiguration().getInitialTransitions()) {
-								if (transition.getService() != null) {
-									ComplexType inputDefinition = transition.getService().getServiceInterface().getInputDefinition();
-									// only if there is a child component
-									if (TypeUtils.getAllChildren(inputDefinition).iterator().hasNext()) {
-										input.add(new ComplexElementImpl(EAIRepositoryUtils.stringToField(transition.getName()), inputDefinition, input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
-									}
-								}
-							}
-						}
-						catch (Exception e) {
-							throw new RuntimeException(e);
-						}
-						this.input = input;
-					}
-				}
-			}
-			return input;
-		}
-
-		@Override
-		public ComplexType getOutputDefinition() {
-			if (output == null) {
-				synchronized(this) {
-					if (output == null) {
-						Structure output = new Structure();
-						output.add(new ComplexElementImpl("workflow", (ComplexType) BeanResolver.getInstance().resolve(WorkflowInstance.class), output));
-						this.output = output;
-					}
-				}
-			}
-			return output;
-		}
-
-		@Override
-		public ServiceInterface getParent() {
-			return null;
-		}
-	}
-
-	@Override
-	public ServiceInstance newInstance() {
-		return new WorkflowServiceInstance(this);
-	}
-
-	@Override
-	public Set<String> getReferences() {
-		return null;
+		DefinedStructure global = new DefinedStructure();
+		global.setName("global");
+		structures.put("global", global);
 	}
 
 	// retry any ongoing flows from this server
@@ -321,69 +245,69 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Def
 		boolean canContinue = targetState.getTransitions() != null && !targetState.getTransitions().isEmpty() && targetState.getTransitionPicker() != null;
 		try {
 			// we execute the mapping service for this entry if any
-			VMService mapping = getMappings().get(transition.getId());
-			if (mapping != null) {
-				ComplexContent mapInput = mapping.getServiceInterface().getInputDefinition().newInstance();
-				mapInput.set("workflow", workflow);
-				mapInput.set("properties", workflowProperties);
-				// we map in the output of the previous transitioner
-				if (previousTransitionOutput != null) {
-					WorkflowTransition transitionById = getTransitionById(previousTransition.getDefinitionId());
-					if (transitionById != null) {
-						mapInput.set(EAIRepositoryUtils.stringToField(transitionById.getName()), previousTransitionOutput);
-					}
-				}
-				ServiceRuntime serviceRuntime = new ServiceRuntime(transition.getService(), getRepository().newExecutionContext(principal));
-				input = serviceRuntime.run(mapInput);
-			}
-			else {
-				input = transition.getService().getServiceInterface().getInputDefinition().newInstance();
-			}
-			// we execute the actual transition service
-			ServiceRuntime runtime = new ServiceRuntime(transition.getService(), getRepository().newExecutionContext(principal));
-			output = runtime.run(input);
-
-			List<WorkflowProperty> propertiesToUpdate = new ArrayList<WorkflowProperty>();
-			List<WorkflowProperty> propertiesToCreate = new ArrayList<WorkflowProperty>();
-			if (transition.getFieldsToStore() != null) {
-				for (String fieldToStore : transition.getFieldsToStore().keySet()) {
-					String query = transition.getFieldsToStore().get(fieldToStore);
-					if (!analyzedOperations.containsKey(query)) {
-						synchronized(analyzedOperations) {
-							if (!analyzedOperations.containsKey(query)) {
-								analyzedOperations.put(query, (TypeOperation) new PathAnalyzer<ComplexContent>(new TypesOperationProvider()).analyze(QueryParser.getInstance().parse(query)));
-							}
-						}
-					}
-					Object value = analyzedOperations.get(query).evaluate(output);
-					boolean found = false;
-					for (WorkflowProperty property : workflowProperties) {
-						if (property.getKey().equals(fieldToStore)) {
-							property.setValue(value == null || value instanceof String ? (String) value : ConverterFactory.getInstance().getConverter().convert(value, String.class));
-							property.setTransitionId(newInstance.getId());
-							propertiesToUpdate.add(property);
-							found = true;
-							break;
-						}
-					}
-					if (!found) {
-						WorkflowProperty property = new WorkflowProperty();
-						property.setId(UUID.randomUUID().toString());
-						property.setWorkflowId(workflow.getId());
-						property.setTransitionId(newInstance.getId());
-						property.setKey(fieldToStore);
-						property.setValue(value == null || value instanceof String ? (String) value : ConverterFactory.getInstance().getConverter().convert(value, String.class));
-						propertiesToCreate.add(property);
-					}
-					if (!propertiesToCreate.isEmpty()) {
-						getConfiguration().getProvider().getWorkflowManager().createWorkflowProperties(transactionId, propertiesToCreate);
-					}
-					if (!propertiesToUpdate.isEmpty()) {
-						getConfiguration().getProvider().getWorkflowManager().updateWorkflowProperties(transactionId, propertiesToUpdate);
-					}
-				}
-			}
-			
+//			VMService mapping = getMappings().get(transition.getId());
+//			if (mapping != null) {
+//				ComplexContent mapInput = mapping.getServiceInterface().getInputDefinition().newInstance();
+//				mapInput.set("workflow", workflow);
+//				mapInput.set("properties", workflowProperties);
+//				// we map in the output of the previous transitioner
+//				if (previousTransitionOutput != null) {
+//					WorkflowTransition transitionById = getTransitionById(previousTransition.getDefinitionId());
+//					if (transitionById != null) {
+//						mapInput.set(EAIRepositoryUtils.stringToField(transitionById.getName()), previousTransitionOutput);
+//					}
+//				}
+//				ServiceRuntime serviceRuntime = new ServiceRuntime(transition.getService(), getRepository().newExecutionContext(principal));
+//				input = serviceRuntime.run(mapInput);
+//			}
+//			else {
+//				input = transition.getService().getServiceInterface().getInputDefinition().newInstance();
+//			}
+//			// we execute the actual transition service
+//			ServiceRuntime runtime = new ServiceRuntime(transition.getService(), getRepository().newExecutionContext(principal));
+//			output = runtime.run(input);
+//
+//			List<WorkflowProperty> propertiesToUpdate = new ArrayList<WorkflowProperty>();
+//			List<WorkflowProperty> propertiesToCreate = new ArrayList<WorkflowProperty>();
+//			if (transition.getFieldsToStore() != null) {
+//				for (String fieldToStore : transition.getFieldsToStore().keySet()) {
+//					String query = transition.getFieldsToStore().get(fieldToStore);
+//					if (!analyzedOperations.containsKey(query)) {
+//						synchronized(analyzedOperations) {
+//							if (!analyzedOperations.containsKey(query)) {
+//								analyzedOperations.put(query, (TypeOperation) new PathAnalyzer<ComplexContent>(new TypesOperationProvider()).analyze(QueryParser.getInstance().parse(query)));
+//							}
+//						}
+//					}
+//					Object value = analyzedOperations.get(query).evaluate(output);
+//					boolean found = false;
+//					for (WorkflowProperty property : workflowProperties) {
+//						if (property.getKey().equals(fieldToStore)) {
+//							property.setValue(value == null || value instanceof String ? (String) value : ConverterFactory.getInstance().getConverter().convert(value, String.class));
+//							property.setTransitionId(newInstance.getId());
+//							propertiesToUpdate.add(property);
+//							found = true;
+//							break;
+//						}
+//					}
+//					if (!found) {
+//						WorkflowProperty property = new WorkflowProperty();
+//						property.setId(UUID.randomUUID().toString());
+//						property.setWorkflowId(workflow.getId());
+//						property.setTransitionId(newInstance.getId());
+//						property.setKey(fieldToStore);
+//						property.setValue(value == null || value instanceof String ? (String) value : ConverterFactory.getInstance().getConverter().convert(value, String.class));
+//						propertiesToCreate.add(property);
+//					}
+//					if (!propertiesToCreate.isEmpty()) {
+//						getConfiguration().getProvider().getWorkflowManager().createWorkflowProperties(transactionId, propertiesToCreate);
+//					}
+//					if (!propertiesToUpdate.isEmpty()) {
+//						getConfiguration().getProvider().getWorkflowManager().updateWorkflowProperties(transactionId, propertiesToUpdate);
+//					}
+//				}
+//			}
+//			
 			transactionId = UUID.randomUUID().toString();
 			try {
 				newInstance.setTransitionState(Level.SUCCEEDED);
@@ -438,7 +362,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Def
 		
 		// continue execution
 		if (canContinue) {
-			run(workflow, getAsTransitionPicker(targetState.getTransitionPicker()), principal, sequence + 1, newInstance, output);
+//			run(workflow, getAsTransitionPicker(targetState.getTransitionPicker()), principal, sequence + 1, newInstance, output);
 		}
 	}
 	
@@ -470,16 +394,12 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Def
 	public WorkflowTransition getTransitionById(String id) {
 		if (!transitions.containsKey(id)) {
 			try {
-				WorkflowState fictiveState = new WorkflowState();
-				fictiveState.setTransitions(getConfiguration().getInitialTransitions());
-				WorkflowTransition transition = getTransitionById(id, fictiveState);
-				if (transition == null) {
-					for (WorkflowState state : getConfiguration().getStates()) {
-						WorkflowTransition potential = getTransitionById(id, state);
-						if (potential != null) {
-							transition = potential;
-							break;
-						}
+				WorkflowTransition transition = null;
+				for (WorkflowState state : getConfiguration().getStates()) {
+					WorkflowTransition potential = getTransitionById(id, state);
+					if (potential != null) {
+						transition = potential;
+						break;
 					}
 				}
 				transitions.put(id, transition);
@@ -510,5 +430,8 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Def
 	public Map<String, VMService> getMappings() {
 		return mappings;
 	}
-	
+
+	public Map<String, DefinedStructure> getStructures() {
+		return structures;
+	}
 }

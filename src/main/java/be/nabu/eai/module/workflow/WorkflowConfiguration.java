@@ -16,19 +16,8 @@ import be.nabu.libs.services.api.DefinedService;
 public class WorkflowConfiguration {
 	
 	private WorkflowProvider provider;
-	private List<WorkflowTransition> initialTransitions;
 	private List<WorkflowState> states;
 	private DefinedService permissionService, roleService, tokenValidatorService;
-	
-	public List<WorkflowTransition> getInitialTransitions() {
-		if (initialTransitions == null) {
-			initialTransitions = new ArrayList<WorkflowTransition>();
-		}
-		return initialTransitions;
-	}
-	public void setInitialTransitions(List<WorkflowTransition> initialTransitions) {
-		this.initialTransitions = initialTransitions;
-	}
 	
 	@NotNull
 	@XmlJavaTypeAdapter(value = ArtifactXMLAdapter.class)
