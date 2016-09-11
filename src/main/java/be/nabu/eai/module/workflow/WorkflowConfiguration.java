@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import javax.validation.constraints.NotNull;
+import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 
 import be.nabu.eai.api.InterfaceFilter;
@@ -11,6 +12,7 @@ import be.nabu.eai.module.workflow.provider.WorkflowProvider;
 import be.nabu.eai.repository.jaxb.ArtifactXMLAdapter;
 import be.nabu.libs.services.api.DefinedService;
 
+@XmlRootElement(name = "workflow")
 public class WorkflowConfiguration {
 	
 	private WorkflowProvider provider;

@@ -5,6 +5,7 @@ import java.util.Map;
 
 import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 
+import be.nabu.eai.repository.jaxb.ArtifactXMLAdapter;
 import be.nabu.eai.repository.util.KeyValueMapAdapter;
 import be.nabu.libs.services.api.DefinedService;
 
@@ -42,6 +43,8 @@ public class WorkflowTransition {
 	public void setDescription(String description) {
 		this.description = description;
 	}
+	
+	@XmlJavaTypeAdapter(value = ArtifactXMLAdapter.class)
 	public DefinedService getService() {
 		return service;
 	}

@@ -164,7 +164,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Def
 	public void start() throws IOException {
 		if (!started) {
 			started = true;
-			if (getConfiguration().getProvider().getConfiguration().getGetRunningWorkflows() != null) {
+			if (getConfiguration().getProvider() != null && getConfiguration().getProvider().getConfiguration().getGetRunningWorkflows() != null) {
 				WorkflowManager workflowManager = getConfiguration().getProvider().getWorkflowManager();
 				List<WorkflowInstance> runningWorkflows = workflowManager.getRunningWorkflows(getRepository().getName(), getId());
 				for (WorkflowInstance workflow : runningWorkflows) {

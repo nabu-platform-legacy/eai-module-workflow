@@ -75,7 +75,7 @@ public class WorkflowProviderConfiguration {
 		this.updateTransition = updateTransition;
 	}
 
-	@InterfaceFilter(implement = "be.nabu.eai.module.workflow.provider.WorkflowManager.getTransition")
+	@InterfaceFilter(implement = "be.nabu.eai.module.workflow.provider.WorkflowManager.getTransitions")
 	@XmlJavaTypeAdapter(value = ArtifactXMLAdapter.class)
 	@NotNull
 	public DefinedService getGetTransitions() {

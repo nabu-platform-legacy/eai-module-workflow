@@ -3,6 +3,9 @@ package be.nabu.eai.module.workflow;
 import java.util.ArrayList;
 import java.util.List;
 
+import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
+
+import be.nabu.eai.repository.jaxb.ArtifactXMLAdapter;
 import be.nabu.libs.services.api.DefinedService;
 
 public class WorkflowState {
@@ -39,6 +42,8 @@ public class WorkflowState {
 	public void setDescription(String description) {
 		this.description = description;
 	}
+	
+	@XmlJavaTypeAdapter(value = ArtifactXMLAdapter.class)
 	public DefinedService getTransitionPicker() {
 		return transitionPicker;
 	}
