@@ -287,7 +287,6 @@ public class WorkflowGUIManager extends BasePortableGUIManager<Workflow, BaseArt
 			public void handle(DragEvent event) {
 				Object content = event.getDragboard().getContent(TreeDragDrop.getDataFormat("connect"));
 				if (content != null) {
-					System.out.println(state.getId() + " accepts request from " + content);
 					event.acceptTransferModes(TransferMode.ANY);
 					event.consume();
 				}

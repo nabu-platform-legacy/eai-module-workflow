@@ -4,11 +4,14 @@ import java.io.IOException;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 import be.nabu.eai.module.services.vm.VMServiceManager;
 import be.nabu.eai.module.types.structure.StructureManager;
+import be.nabu.eai.module.workflow.transition.WorkflowTransitionService;
 import be.nabu.eai.repository.EAINode;
 import be.nabu.eai.repository.EAIRepositoryUtils;
 import be.nabu.eai.repository.EAIResourceRepository;
@@ -26,6 +29,7 @@ import be.nabu.libs.artifacts.api.Artifact;
 import be.nabu.libs.resources.api.ManageableContainer;
 import be.nabu.libs.resources.api.Resource;
 import be.nabu.libs.resources.api.ResourceContainer;
+import be.nabu.libs.services.api.DefinedService;
 import be.nabu.libs.services.vm.api.VMService;
 import be.nabu.libs.types.structure.DefinedStructure;
 import be.nabu.libs.validator.api.Validation;
@@ -176,6 +180,56 @@ public class WorkflowManager extends JAXBArtifactManager<WorkflowConfiguration, 
 			directParent.addChildren(childEntry);
 			entries.add(childEntry);
 		}
+		
+		// we need a service for each transition
+		ModifiableEntry services = EAIRepositoryUtils.getParent(parent, "services", true);
+		
+		Map<String, WorkflowState> initialStates = new HashMap<String, WorkflowState>();
+		List<String> targetedStates = new ArrayList<String>();
+		for (WorkflowState state : artifact.getConfig().getStates()) {
+			initialStates.put(state.getId(), state);
+			for (WorkflowTransition transition : state.getTransitions()) {
+				targetedStates.add(transition.getTargetStateId());
+			}
+		}
+		for (String targetedState : targetedStates) {
+			initialStates.remove(targetedState);
+		}
+		
+		// initial transitions that can create the workflow
+		ModifiableEntry initial = EAIRepositoryUtils.getParent(services, "initial", true);
+		for (WorkflowState state : initialStates.values()) {
+			for (WorkflowTransition transition : state.getTransitions()) {
+				EAINode node = new EAINode();
+				node.setArtifactClass(DefinedService.class);
+				WorkflowTransitionService service = new WorkflowTransitionService(artifact, state, transition, true);
+				node.setArtifact(service);
+				node.setLeaf(true);
+				Entry childEntry = new MemoryEntry(parent.getRepository(), initial, node, service.getId(), service.getName());
+				node.setEntry(childEntry);
+				initial.addChildren(childEntry);
+				entries.add(childEntry);
+			}
+		}
+		
+		// other transitions that can be triggered on the workflow
+		ModifiableEntry transitions = EAIRepositoryUtils.getParent(services, "transition", true);
+		for (WorkflowState state : artifact.getConfig().getStates()) {
+			if (!initialStates.containsValue(state)) {
+				for (WorkflowTransition transition : state.getTransitions()) {
+					EAINode node = new EAINode();
+					node.setArtifactClass(DefinedService.class);
+					WorkflowTransitionService service = new WorkflowTransitionService(artifact, state, transition, false);
+					node.setArtifact(service);
+					node.setLeaf(true);
+					Entry childEntry = new MemoryEntry(parent.getRepository(), transitions, node, service.getId(), service.getName());
+					node.setEntry(childEntry);
+					transitions.addChildren(childEntry);
+					entries.add(childEntry);		
+				}
+			}
+		}
+		
 		return entries;
 	}
 
@@ -183,14 +237,22 @@ public class WorkflowManager extends JAXBArtifactManager<WorkflowConfiguration, 
 	public List<Entry> removeChildren(ModifiableEntry parent, Workflow artifact) {
 		List<Entry> entries = new ArrayList<Entry>();
 		ModifiableEntry structures = EAIRepositoryUtils.getParent(parent, "types", true);
-		Iterator<Entry> iterator = structures.iterator();
-		while (iterator.hasNext()) {
-			entries.add(iterator.next());
-		}
-		for (Entry toRemove : entries) {
-			structures.removeChildren(toRemove.getName());
-		}
+		removeRecursively(structures, entries);
+		ModifiableEntry services = EAIRepositoryUtils.getParent(parent, "services", true);
+		removeRecursively(services, entries);
+		entries.add(services);
 		return entries;
 	}
 	
+	public static void removeRecursively(ModifiableEntry parent, List<Entry> entries) {
+		List<String> toRemove = new ArrayList<String>();
+		for (Entry child : parent) {
+			entries.add(child);
+			toRemove.add(child.getName());
+			if (child instanceof ModifiableEntry) {
+				removeRecursively((ModifiableEntry) child, entries);
+			}
+		}
+		parent.removeChildren(toRemove.toArray(new String[toRemove.size()]));
+	}
 }
