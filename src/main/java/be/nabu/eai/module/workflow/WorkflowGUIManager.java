@@ -42,7 +42,9 @@ import be.nabu.eai.developer.managers.base.BasePortableGUIManager;
 import be.nabu.eai.developer.managers.util.MovablePane;
 import be.nabu.eai.developer.managers.util.SimpleProperty;
 import be.nabu.eai.developer.managers.util.SimplePropertyUpdater;
+import be.nabu.eai.developer.util.Confirm;
 import be.nabu.eai.developer.util.EAIDeveloperUtils;
+import be.nabu.eai.developer.util.Confirm.ConfirmType;
 import be.nabu.eai.module.services.vm.VMServiceGUIManager;
 import be.nabu.eai.module.types.structure.StructureGUIManager;
 import be.nabu.eai.module.workflow.gui.RectangleWithHooks;
@@ -138,7 +140,8 @@ public class WorkflowGUIManager extends BasePortableGUIManager<Workflow, BaseArt
 							state.setName(name);
 							artifact.getConfig().getStates().add(state);
 							DefinedStructure value = new DefinedStructure();
-							value.setName("transient");
+							value.setName("state");
+							value.setId(artifact.getId() + ".types.states." + EAIRepositoryUtils.stringToField(state.getName()));
 							artifact.getStructures().put(state.getId(), value);
 							((WorkflowManager) getArtifactManager()).refreshChildren((ModifiableEntry) artifact.getRepository().getEntry(artifact.getId()), artifact);
 							drawState(artifact, state);
@@ -149,7 +152,24 @@ public class WorkflowGUIManager extends BasePortableGUIManager<Workflow, BaseArt
 			}
 		});
 		
-		buttons.getChildren().addAll(addState);
+		Button editGlobalState = new Button("Edit Global State");
+		editGlobalState.addEventHandler(ActionEvent.ANY, new EventHandler<ActionEvent>() {
+			@Override
+			public void handle(ActionEvent event) {
+				if (!event.isConsumed()) {
+					mapPane.getChildren().clear();
+					// add an editor for the transient state
+					try {
+						new StructureGUIManager().display(MainController.getInstance(), mapPane, artifact.getStructures().get("global"));
+					}
+					catch (Exception e) {
+						throw new RuntimeException(e);
+					}
+				}
+			}
+		});
+		
+		buttons.getChildren().addAll(addState, editGlobalState);
 		
 		vbox.getChildren().addAll(buttons, drawPane);
 		
@@ -166,9 +186,11 @@ public class WorkflowGUIManager extends BasePortableGUIManager<Workflow, BaseArt
 
 	private void drawState(final Workflow workflow, final WorkflowState state) {
 //		Paint.valueOf("#ddffcf"), Paint.valueOf("#195700")
-		RectangleWithHooks rectangle = new RectangleWithHooks(state.getX(), state.getY(), 200, 100, "state", "correct");
+		RectangleWithHooks rectangle = new RectangleWithHooks(state.getX(), state.getY(), 200, 45, "state", "correct");
 //		rectangle.getPane().setManaged(false);
-		rectangle.getContent().getChildren().add(new Label(state.getName()));
+		Label label = new Label(state.getName());
+		label.getStyleClass().add("workflow-name");
+		rectangle.getContent().getChildren().add(label);
 		
 		MovablePane movable = MovablePane.makeMovable(rectangle.getContainer());
 		// make sure we update position changes
@@ -190,7 +212,7 @@ public class WorkflowGUIManager extends BasePortableGUIManager<Workflow, BaseArt
 		Scene scene = MainController.getInstance().getStage().getScene();
 		rectangle.getContent().addEventHandler(MouseEvent.MOUSE_CLICKED, new EventHandler<MouseEvent>() {
 			@Override
-			public void handle(MouseEvent arg0) {
+			public void handle(MouseEvent event) {
 				mapPane.getChildren().clear();
 				// add an editor for the transient state
 				try {
@@ -201,31 +223,44 @@ public class WorkflowGUIManager extends BasePortableGUIManager<Workflow, BaseArt
 				}
 				// focus on the state for deletion if necessary
 				rectangle.getContent().requestFocus();
+				event.consume();
 			}
 		});
 		rectangle.getContent().addEventHandler(KeyEvent.KEY_PRESSED, new EventHandler<KeyEvent>() {
 			@Override
 			public void handle(KeyEvent event) {
 				if (event.getCode() == KeyCode.DELETE) {
-					// remove all transitions that reach this state
-					for (WorkflowState child : workflow.getConfig().getStates()) {
-						Iterator<WorkflowTransition> iterator = child.getTransitions().iterator();
-						while (iterator.hasNext()) {
-							WorkflowTransition next = iterator.next();
-							if (state.getId().equals(next.getTargetStateId())) {
-								iterator.remove();
-								// the transition goes to the state-to-be-removed
-								removeTransition(workflow, child, next);
+					Confirm.confirm(ConfirmType.QUESTION, "Delete state?", "Are you sure you want to delete the state '" + state.getName() + "'", new EventHandler<ActionEvent>() {
+						@Override
+						public void handle(ActionEvent arg0) {
+							// remove all transitions that reach this state
+							for (WorkflowState child : workflow.getConfig().getStates()) {
+								Iterator<WorkflowTransition> iterator = child.getTransitions().iterator();
+								while (iterator.hasNext()) {
+									WorkflowTransition next = iterator.next();
+									if (state.getId().equals(next.getTargetStateId())) {
+										iterator.remove();
+										// the transition goes to the state-to-be-removed
+										removeTransition(workflow, child, next);
+									}
+								}
 							}
+							// delete all transitions that start from this state
+							Iterator<WorkflowTransition> iterator = state.getTransitions().iterator();
+							while (iterator.hasNext()) {
+								WorkflowTransition transition = iterator.next();
+								iterator.remove();
+								removeTransition(workflow, state, transition);
+							}
+							drawPane.getChildren().remove(states.get(state.getId()).getContainer());
+							states.remove(state.getId());
+							// remove the state
+							workflow.getConfig().getStates().remove(state);
+							// remove the structure associated with the transiens state (if any)
+							workflow.getStructures().remove(state.getId());
+							MainController.getInstance().setChanged();
 						}
-					}
-					drawPane.getChildren().remove(states.get(state.getId()).getContainer());
-					states.remove(state.getId());
-					// remove the state
-					workflow.getConfig().getStates().remove(state);
-					// remove the structure associated with the transiens state (if any)
-					workflow.getStructures().remove(state.getId());
-					MainController.getInstance().setChanged();
+					});
 				}
 			}
 		});
@@ -277,20 +312,30 @@ public class WorkflowGUIManager extends BasePortableGUIManager<Workflow, BaseArt
 								transition.setId(UUID.randomUUID().toString());
 								transition.setTargetStateId(state.getId());
 								transition.setName(name);
+								
+								
 								for (WorkflowState child : workflow.getConfig().getStates()) {
 									if (child.getId().equals(content)) {
 										child.getTransitions().add(transition);
+
+										DefinedStructure value = new DefinedStructure();
+										value.setId(workflow.getId() + ".types.transitions." + EAIRepositoryUtils.stringToField(transition.getName()));
+										value.setName("transition");
+										workflow.getStructures().put(transition.getId(), value);
+										((WorkflowManager) getArtifactManager()).refreshChildren((ModifiableEntry) workflow.getRepository().getEntry(workflow.getId()), workflow);
+
 										transition.setX(state.getX() + ((child.getX() - state.getX()) / 2));
 										transition.setY(state.getY());
 										Structure input = new Structure();
 										input.setName("input");
-										input.add(new ComplexElementImpl("global", (ComplexType) workflow.getRepository().resolve(workflow.getId() + ".state.global"), input));
-										input.add(new ComplexElementImpl("transient", (ComplexType) workflow.getRepository().resolve(workflow.getId() + ".state." + EAIRepositoryUtils.stringToField(child.getName())), input));
+										input.add(new ComplexElementImpl("global", (ComplexType) workflow.getRepository().resolve(workflow.getId() + ".types.global"), input));
+										input.add(new ComplexElementImpl("state", (ComplexType) workflow.getRepository().resolve(workflow.getId() + ".types.states." + EAIRepositoryUtils.stringToField(child.getName())), input));
+										input.add(new ComplexElementImpl("transition", (ComplexType) workflow.getRepository().resolve(workflow.getId() + ".types.transitions." + EAIRepositoryUtils.stringToField(transition.getName())), input));
 										
 										Structure output = new Structure();
 										output.setName("output");
-										output.add(new ComplexElementImpl("global", (ComplexType) workflow.getRepository().resolve(workflow.getId() + ".state.global"), output));
-										output.add(new ComplexElementImpl("transient", (ComplexType) workflow.getRepository().resolve(workflow.getId() + ".state." + EAIRepositoryUtils.stringToField(state.getName())), output));
+										output.add(new ComplexElementImpl("global", (ComplexType) workflow.getRepository().resolve(workflow.getId() + ".types.global"), output));
+										output.add(new ComplexElementImpl("state", (ComplexType) workflow.getRepository().resolve(workflow.getId() + ".types.states." + EAIRepositoryUtils.stringToField(state.getName())), output));
 										
 										Pipeline pipeline = new Pipeline(input, output);
 										SimpleVMServiceDefinition service = new SimpleVMServiceDefinition(pipeline);
@@ -348,7 +393,9 @@ public class WorkflowGUIManager extends BasePortableGUIManager<Workflow, BaseArt
 		VBox box = new VBox();
 		Circle circle = new Circle(10);
 		circle.getStyleClass().add("connectionLine");
-		box.getChildren().addAll(circle, new Label(transition.getName()));
+		Label label = new Label(transition.getName());
+		label.getStyleClass().add("workflow-name");
+		box.getChildren().addAll(circle, label);
 		pane.getChildren().add(box);
 		pane.setManaged(false);
 		pane.setLayoutX(transition.getX());
@@ -357,12 +404,12 @@ public class WorkflowGUIManager extends BasePortableGUIManager<Workflow, BaseArt
 		
 		circle.addEventHandler(MouseEvent.MOUSE_CLICKED, new EventHandler<MouseEvent>() {
 			@Override
-			public void handle(MouseEvent arg0) {
+			public void handle(MouseEvent event) {
 				AnchorPane pane = new AnchorPane();
 				try {
 					VMServiceGUIManager serviceManager = new VMServiceGUIManager();
+					serviceManager.setDisablePipelineEditing(true);
 					VMService service = workflow.getMappings().get(transition.getId());
-					System.out.println("SERVICE = " + service + " / " + transition.getId() + " / " + workflow.getMappings());
 					VMServiceController controller = serviceManager.displayWithController(MainController.getInstance(), pane, service);
 					TreeItem<Step> root = serviceManager.getServiceTree().rootProperty().get();
 					TreeItem<Step> treeItem = root.getChildren().get(0);
@@ -375,6 +422,7 @@ public class WorkflowGUIManager extends BasePortableGUIManager<Workflow, BaseArt
 					AnchorPane.setTopAnchor(panMap, 0d);
 					AnchorPane.setRightAnchor(panMap, 0d);
 					AnchorPane.setLeftAnchor(panMap, 0d);
+					event.consume();
 				}
 				catch (Exception e) {
 					throw new RuntimeException(e);
@@ -411,14 +459,29 @@ public class WorkflowGUIManager extends BasePortableGUIManager<Workflow, BaseArt
 			@Override
 			public void handle(KeyEvent event) {
 				if (event.getCode() == KeyCode.DELETE) {
-					removeTransition(workflow, state, transition);
+					Confirm.confirm(ConfirmType.QUESTION, "Delete transition?", "Are you sure you want to delete the transition '" + transition.getName() + "'", new EventHandler<ActionEvent>() {
+						@Override
+						public void handle(ActionEvent arg0) {
+							removeTransition(workflow, state, transition);
+						}
+					});
 				}
 			}
 		});
 		line1.addEventHandler(MouseEvent.MOUSE_CLICKED, new EventHandler<MouseEvent>() {
 			@Override
 			public void handle(MouseEvent event) {
+				mapPane.getChildren().clear();
+				// add an editor for the transient state
+				try {
+					new StructureGUIManager().display(MainController.getInstance(), mapPane, workflow.getStructures().get(transition.getId()));
+				}
+				catch (Exception e) {
+					throw new RuntimeException(e);
+				}
+				// focus on the state for deletion if necessary
 				line1.requestFocus();
+				event.consume();
 			}
 		});
 		line1.getStyleClass().add("connectionLine");

@@ -4,53 +4,32 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.security.Principal;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import be.nabu.eai.module.workflow.provider.WorkflowTransitionInstance;
 import be.nabu.eai.module.workflow.provider.WorkflowInstance;
 import be.nabu.eai.module.workflow.provider.WorkflowInstance.Level;
 import be.nabu.eai.module.workflow.provider.WorkflowManager;
 import be.nabu.eai.module.workflow.provider.WorkflowProperty;
 import be.nabu.eai.module.workflow.provider.WorkflowProvider;
-import be.nabu.eai.repository.EAIRepositoryUtils;
+import be.nabu.eai.module.workflow.provider.WorkflowTransitionInstance;
 import be.nabu.eai.repository.api.Repository;
 import be.nabu.eai.repository.artifacts.jaxb.JAXBArtifact;
 import be.nabu.eai.repository.util.SystemPrincipal;
 import be.nabu.libs.artifacts.api.StartableArtifact;
-import be.nabu.libs.converter.ConverterFactory;
-import be.nabu.libs.evaluator.PathAnalyzer;
-import be.nabu.libs.evaluator.QueryParser;
 import be.nabu.libs.evaluator.types.api.TypeOperation;
-import be.nabu.libs.evaluator.types.operations.TypesOperationProvider;
 import be.nabu.libs.resources.api.ResourceContainer;
-import be.nabu.libs.services.ServiceRuntime;
-import be.nabu.libs.services.api.DefinedService;
 import be.nabu.libs.services.api.ServiceException;
-import be.nabu.libs.services.api.ServiceInstance;
-import be.nabu.libs.services.api.ServiceInterface;
-import be.nabu.libs.services.pojo.POJOUtils;
 import be.nabu.libs.services.vm.api.VMService;
-import be.nabu.libs.types.SimpleTypeWrapperFactory;
-import be.nabu.libs.types.TypeUtils;
 import be.nabu.libs.types.api.ComplexContent;
-import be.nabu.libs.types.api.ComplexType;
-import be.nabu.libs.types.base.ComplexElementImpl;
-import be.nabu.libs.types.base.SimpleElementImpl;
-import be.nabu.libs.types.base.ValueImpl;
-import be.nabu.libs.types.java.BeanResolver;
-import be.nabu.libs.types.properties.MinOccursProperty;
 import be.nabu.libs.types.structure.DefinedStructure;
-import be.nabu.libs.types.structure.Structure;
 
 // expose folders for each state with transition methods (input extends actual transition service input + workflow instance id)
 // only expose if state is manual? as in, no transition picker
@@ -123,10 +102,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 							// if it is the last transition
 							if (transitions.indexOf(statelessParent) == transitions.size() - 1) {
 								WorkflowTransition transitionDefinition = getTransitionById(statelessParent.getDefinitionId());
-								// and it's an automatic, run it
-								if (getStateById(transitionDefinition.getTargetStateId()).getTransitionPicker() != null) {
-									run(workflow, getAsTransitionPicker(getStateById(transitionDefinition.getTargetStateId()).getTransitionPicker()), SystemPrincipal.ROOT, nextSequence, statelessParent, null);
-								}
+								run(workflow, getStateById(transitionDefinition.getTargetStateId()), SystemPrincipal.ROOT, nextSequence, statelessParent, null);
 							}
 							else {
 								// we first need the next transition attempted, so we know how the workflow was supposed to go
@@ -152,11 +128,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 		}
 	}
 	
-	public TransitionPicker getAsTransitionPicker(DefinedService service) {
-		return service == null ? null : POJOUtils.newProxy(TransitionPicker.class, getRepository(), SystemPrincipal.ROOT, service);
-	}
-	
-	public void run(WorkflowInstance workflow, TransitionPicker picker, Principal principal, int sequence, WorkflowTransitionInstance previousTransition, ComplexContent previousTransitionOutput) throws IOException {
+	public void run(WorkflowInstance workflow, WorkflowState state, Principal principal, int sequence, WorkflowTransitionInstance previousTransition, ComplexContent previousTransitionOutput) throws IOException {
 		String transactionId = UUID.randomUUID().toString();
 		List<WorkflowProperty> workflowProperties;
 		try {
@@ -170,7 +142,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 		finally {
 			WorkflowProvider.executionContext.set(null);
 		}
-		WorkflowTransition pickTransition = picker.pickTransition(workflow, previousTransition, workflowProperties);
+		WorkflowTransition pickTransition = null;
 		if (pickTransition != null) {
 			run(workflow, pickTransition, principal, sequence, previousTransition, previousTransitionOutput, workflowProperties);
 		}
@@ -242,7 +214,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 			WorkflowProvider.executionContext.set(null);
 		}
 		WorkflowState targetState = getStateById(transition.getTargetStateId());
-		boolean canContinue = targetState.getTransitions() != null && !targetState.getTransitions().isEmpty() && targetState.getTransitionPicker() != null;
+		boolean canContinue = targetState.getTransitions() != null && !targetState.getTransitions().isEmpty();
 		try {
 			// we execute the mapping service for this entry if any
 //			VMService mapping = getMappings().get(transition.getId());

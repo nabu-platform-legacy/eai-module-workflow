@@ -3,18 +3,11 @@ package be.nabu.eai.module.workflow;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
-
-import be.nabu.eai.repository.jaxb.ArtifactXMLAdapter;
-import be.nabu.libs.services.api.DefinedService;
-
 public class WorkflowState {
 	// a generated if for this state
 	private String id;
 	// the name of the state
 	private String name, description;
-	// a service that can pick a certain transition (by name)
-	private DefinedService transitionPicker;
 	// whether this state is stateless... basically means there is only the workflow state, no additional state-state
 	// this means we can not use outputs from previous transitions directly for optimization
 	// but it also means we can do stuff like retry, parallel etc when a flow is in such a state
@@ -43,13 +36,6 @@ public class WorkflowState {
 		this.description = description;
 	}
 	
-	@XmlJavaTypeAdapter(value = ArtifactXMLAdapter.class)
-	public DefinedService getTransitionPicker() {
-		return transitionPicker;
-	}
-	public void setTransitionPicker(DefinedService transitionPicker) {
-		this.transitionPicker = transitionPicker;
-	}
 	public boolean isStateless() {
 		return stateless;
 	}

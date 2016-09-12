@@ -17,7 +17,6 @@ import be.nabu.eai.repository.api.Entry;
 import be.nabu.eai.repository.api.ModifiableEntry;
 import be.nabu.eai.repository.api.Repository;
 import be.nabu.eai.repository.api.ResourceEntry;
-import be.nabu.eai.repository.api.ResourceRepository;
 import be.nabu.eai.repository.artifacts.container.ContainerArtifactManager.WrapperEntry;
 import be.nabu.eai.repository.artifacts.container.ContainerArtifactManager.ContainerRepository;
 import be.nabu.eai.repository.managers.base.JAXBArtifactManager;
@@ -52,12 +51,34 @@ public class WorkflowManager extends JAXBArtifactManager<WorkflowConfiguration, 
 			if (structures != null) {
 				for (Resource child : (ResourceContainer<?>) structures) {
 					DefinedStructure loaded = new StructureManager().load(new WrapperEntry(entry.getRepository(), entry, (ResourceContainer<?>) child, child.getName()), messages);
-					loaded.setId(entry.getId() + ".state." + (child.getName().equals("global") ? "global" : EAIRepositoryUtils.stringToField(workflow.getStateById(child.getName()).getName())));
+					String group;
+					String name;
+					if (child.getName().equals("global")) {
+						group = "types";
+						name = "global";
+					}
+					else {
+						WorkflowState stateById = workflow.getStateById(child.getName());
+						if (stateById != null) {
+							group = "types.states";
+							name = EAIRepositoryUtils.stringToField(stateById.getName());
+						}
+						else {
+							WorkflowTransition transitionById = workflow.getTransitionById(child.getName());
+							if (transitionById == null) {
+								continue;
+							}
+							group = "types.transitions";
+							name = EAIRepositoryUtils.stringToField(transitionById.getName());
+						}
+					}
+					loaded.setId(entry.getId() + "." + group + "." + name);
 					workflow.getStructures().put(child.getName(), loaded);
 				}
 			}
 			// Tricky stuff: the services that do the mapping are based on the documents we dynamically add to state
 			ContainerRepository containerRepository = new ContainerRepository(entry.getId(), (RepositoryEntry) entry, (Collection<Artifact>) (Collection) workflow.getStructures().values());
+			containerRepository.setExactAliases(true);
 			for (DefinedStructure structure : workflow.getStructures().values()) {
 				containerRepository.alias(entry.getId() + ":" + structure.getId(), structure.getId());
 			}
@@ -119,28 +140,40 @@ public class WorkflowManager extends JAXBArtifactManager<WorkflowConfiguration, 
 	public List<Entry> addChildren(ModifiableEntry parent, Workflow artifact) {
 		List<Entry> entries = new ArrayList<Entry>();
 		// add the state structures
-		ModifiableEntry structures = EAIRepositoryUtils.getParent(parent, "state", true);
+		ModifiableEntry types = EAIRepositoryUtils.getParent(parent, "types", true);
 		for (String id : artifact.getStructures().keySet()) {
+			String group = null;
 			String name;
 			if (id.equals("global")) {
 				name = "global";
 			}
 			else {
 				WorkflowState stateById = artifact.getStateById(id);
-				if (stateById == null) {
-					throw new RuntimeException("Could not find state with id: " + id);
+				if (stateById != null) {
+					name = EAIRepositoryUtils.stringToField(stateById.getName());
+					group = "states";
 				}
-				name = EAIRepositoryUtils.stringToField(stateById.getName());
+				else {
+					WorkflowTransition transitionById = artifact.getTransitionById(id);
+					if (transitionById != null) {
+						name = EAIRepositoryUtils.stringToField(transitionById.getName());
+						group = "transitions";
+					}
+					else {
+						throw new RuntimeException("Could not find " + id);
+					}
+				}
 			}
+			ModifiableEntry directParent = group == null ? types : EAIRepositoryUtils.getParent(types, group, true);
 			EAINode node = new EAINode();
 			node.setArtifactClass(DefinedStructure.class);
 			node.setArtifact(artifact.getStructures().get(id));
 			node.setLeaf(true);
-			Entry childEntry = new MemoryEntry(parent.getRepository(), structures, node, structures.getId() + "." + name, name);
+			Entry childEntry = new MemoryEntry(parent.getRepository(), directParent, node, directParent.getId() + "." + name, name);
 			// need to explicitly set id (it was loaded from file)
 			artifact.getStructures().get(id).setId(childEntry.getId());
 			node.setEntry(childEntry);
-			structures.addChildren(childEntry);
+			directParent.addChildren(childEntry);
 			entries.add(childEntry);
 		}
 		return entries;
@@ -149,7 +182,7 @@ public class WorkflowManager extends JAXBArtifactManager<WorkflowConfiguration, 
 	@Override
 	public List<Entry> removeChildren(ModifiableEntry parent, Workflow artifact) {
 		List<Entry> entries = new ArrayList<Entry>();
-		ModifiableEntry structures = EAIRepositoryUtils.getParent(parent, "state", true);
+		ModifiableEntry structures = EAIRepositoryUtils.getParent(parent, "types", true);
 		Iterator<Entry> iterator = structures.iterator();
 		while (iterator.hasNext()) {
 			entries.add(iterator.next());

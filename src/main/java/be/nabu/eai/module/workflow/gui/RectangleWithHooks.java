@@ -31,8 +31,8 @@ public class RectangleWithHooks {
 		container.maxWidthProperty().bind(container.prefWidthProperty());
 		container.minHeightProperty().bind(container.prefHeightProperty());
 		container.maxHeightProperty().bind(container.prefHeightProperty());
-		container.setPrefWidth(200);
-		container.setPrefHeight(100);
+		container.setPrefWidth(width);
+		container.setPrefHeight(height);
 		container.setManaged(false);
 
 		content = new VBox();
