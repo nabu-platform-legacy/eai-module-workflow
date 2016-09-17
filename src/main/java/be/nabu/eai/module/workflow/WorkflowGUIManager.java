@@ -35,6 +35,7 @@ import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import be.nabu.eai.developer.MainController;
 import be.nabu.eai.developer.controllers.VMServiceController;
@@ -154,7 +155,7 @@ public class WorkflowGUIManager extends BasePortableGUIManager<Workflow, BaseArt
 			}
 		});
 		
-		Button editProperties = new Button("Edit Properties");
+		Button editProperties = new Button("Edit Workflow Properties");
 		editProperties.addEventHandler(ActionEvent.ANY, new EventHandler<ActionEvent>() {
 			@Override
 			public void handle(ActionEvent event) {
@@ -393,8 +394,9 @@ public class WorkflowGUIManager extends BasePortableGUIManager<Workflow, BaseArt
 		
 		AnchorPane pane = new AnchorPane();
 		VBox box = new VBox();
-		Circle circle = new Circle(10);
+		Circle circle = new Circle(5);
 		circle.getStyleClass().add("connectionLine");
+		circle.setFill(Color.TRANSPARENT);
 		Label label = new Label(transition.getName());
 		label.getStyleClass().add("workflow-name");
 		box.getChildren().addAll(circle, label);
@@ -490,7 +492,7 @@ public class WorkflowGUIManager extends BasePortableGUIManager<Workflow, BaseArt
 		
 		Line line2 = new Line();
 		line2.eventSizeProperty().set(5);
-		line2.startXProperty().bind(pane.layoutXProperty().add(pane.widthProperty()));
+		line2.startXProperty().bind(pane.layoutXProperty().add(circle.radiusProperty().multiply(2)));
 		line2.startYProperty().bind(pane.layoutYProperty().add(circle.layoutYProperty()).add(circle.centerYProperty()));
 		line2.endXProperty().bind(states.get(transition.getTargetStateId()).leftAnchorXProperty());
 		line2.endYProperty().bind(states.get(transition.getTargetStateId()).leftAnchorYProperty());

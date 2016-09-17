@@ -4,8 +4,10 @@ import java.util.Date;
 
 import javax.validation.constraints.NotNull;
 import javax.xml.bind.annotation.XmlRootElement;
+import javax.xml.bind.annotation.XmlType;
 
 @XmlRootElement
+@XmlType(propOrder = { "id", "definitionId", "parentId", "batchId", "contextId", "started", "stopped", "environment", "transitionState" })
 public class WorkflowInstance {
 	private String id, parentId, definitionId;
 	private Date started, stopped;
@@ -49,6 +51,7 @@ public class WorkflowInstance {
 		this.stopped = stopped;
 	}
 	
+	@NotNull
 	public String getStateId() {
 		return stateId;
 	}

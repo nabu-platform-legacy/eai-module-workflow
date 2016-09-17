@@ -44,15 +44,14 @@ public class WorkflowTransitionServiceInstance implements ServiceInstance {
 			instance.setBatchId((String) input.get("batchId"));
 			instance.setStarted(new Date());
 			instance.setDefinitionId(service.getWorkflow().getId());
-			// TODO: update to cluster name instead of system name
-			instance.setEnvironment(service.getWorkflow().getRepository().getName());
+			instance.setEnvironment(service.getWorkflow().getRepository().getGroup());
 			instance.setStateId(service.getFromState().getId());
 			instance.setTransitionState(Level.RUNNING);
 			
 			Workflow.runTransactionally(new TransactionableAction<Void>() {
 				@Override
 				public Void call(String transactionId) throws Exception {
-					service.getWorkflow().getConfig().getProvider().getWorkflowManager().createWorkflow(transactionId, instance);
+					service.getWorkflow().getConfig().getProvider().getWorkflowManager().createWorkflow(service.getWorkflow().getConfig().getConnectionId(), transactionId, instance);
 					return null;
 				}
 			});
@@ -63,12 +62,12 @@ public class WorkflowTransitionServiceInstance implements ServiceInstance {
 				throw new ServiceException("WORKFLOW-1", "No workflow id given");
 			}
 			WorkflowManager workflowManager = service.getWorkflow().getConfig().getProvider().getWorkflowManager();
-			instance = workflowManager.getWorkflow(workflowId);
-			List<WorkflowTransitionInstance> transitions = workflowManager.getTransitions(workflowId);
+			instance = workflowManager.getWorkflow(service.getWorkflow().getConfig().getConnectionId(), workflowId);
+			List<WorkflowTransitionInstance> transitions = workflowManager.getTransitions(service.getWorkflow().getConfig().getConnectionId(), workflowId);
 			if (transitions != null) {
 				history.addAll(transitions);
 			}
-			List<WorkflowInstanceProperty> workflowProperties = workflowManager.getWorkflowProperties(workflowId);
+			List<WorkflowInstanceProperty> workflowProperties = workflowManager.getWorkflowProperties(service.getWorkflow().getConfig().getConnectionId(), workflowId);
 			if (workflowProperties != null) {
 				properties.addAll(workflowProperties);
 			}

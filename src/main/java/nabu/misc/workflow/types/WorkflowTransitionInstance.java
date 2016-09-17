@@ -4,10 +4,12 @@ import java.util.Date;
 
 import javax.validation.constraints.NotNull;
 import javax.xml.bind.annotation.XmlRootElement;
+import javax.xml.bind.annotation.XmlType;
 
 import nabu.misc.workflow.types.WorkflowInstance.Level;
 
 @XmlRootElement
+@XmlType(propOrder = { "id", "definitionId", "workflowId", "parentId", "actorId", "systemId", "started", "stopped", "log", "errorLog", "errorCode", "sequence", "transitionState" })
 public class WorkflowTransitionInstance implements Comparable<WorkflowTransitionInstance> {
 	// the parent id is of the transition that came before
 	private String id, workflowId, parentId, definitionId;

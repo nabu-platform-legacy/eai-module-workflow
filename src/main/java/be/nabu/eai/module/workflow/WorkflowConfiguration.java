@@ -15,6 +15,7 @@ import be.nabu.libs.services.api.DefinedService;
 @XmlRootElement(name = "workflow")
 public class WorkflowConfiguration {
 	
+	private String connectionId;
 	private WorkflowProvider provider;
 	private List<WorkflowState> states;
 	private DefinedService permissionService, roleService, tokenValidatorService;
@@ -63,6 +64,13 @@ public class WorkflowConfiguration {
 	}
 	public void setTokenValidatorService(DefinedService tokenValidatorService) {
 		this.tokenValidatorService = tokenValidatorService;
+	}
+	
+	public String getConnectionId() {
+		return connectionId;
+	}
+	public void setConnectionId(String connectionId) {
+		this.connectionId = connectionId;
 	}
 	
 }

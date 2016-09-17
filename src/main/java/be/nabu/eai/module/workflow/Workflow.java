@@ -107,14 +107,14 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 	public void recover() {
 		if (getConfig().getProvider() != null && getConfig().getProvider().getConfig().getGetWorkflows() != null) {
 			WorkflowManager workflowManager = getConfig().getProvider().getWorkflowManager();
-			List<WorkflowInstance> runningWorkflows = workflowManager.getWorkflows(getRepository().getName(), getId(), Level.RUNNING);
+			List<WorkflowInstance> runningWorkflows = workflowManager.getWorkflows(getConfig().getConnectionId(), getRepository().getName(), getId(), Level.RUNNING);
 			if (runningWorkflows != null) {
 				for (WorkflowInstance workflow : runningWorkflows) {
 					try {
 						// mark workflow as reverted
 						workflow.setTransitionState(Level.REVERTED);
 						
-						List<WorkflowTransitionInstance> transitions = workflowManager.getTransitions(workflow.getId());
+						List<WorkflowTransitionInstance> transitions = workflowManager.getTransitions(getConfig().getConnectionId(), workflow.getId());
 						Collections.sort(transitions);
 
 						// if the last transition was RUNNING, it has to be reverted
@@ -129,9 +129,9 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 							@Override
 							public Void call(String transactionId) throws Exception {
 								WorkflowManager workflowManager = getConfig().getProvider().getWorkflowManager();
-								workflowManager.updateWorkflow(transactionId, workflow);
+								workflowManager.updateWorkflow(getConfig().getConnectionId(), transactionId, workflow);
 								if (last.getTransitionState() == Level.REVERTED) {
-									workflowManager.updateTransition(transactionId, last);
+									workflowManager.updateTransition(getConfig().getConnectionId(), transactionId, last);
 								}
 								return null;
 							}
@@ -244,10 +244,10 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 		runTransactionally(new TransactionableAction<Void>() {
 			@Override
 			public Void call(String transactionId) throws Exception {
-				getConfiguration().getProvider().getWorkflowManager().createTransition(transactionId, newInstance);
+				getConfiguration().getProvider().getWorkflowManager().createTransition(getConfig().getConnectionId(), transactionId, newInstance);
 				if (workflow.getTransitionState() != Level.RUNNING) {
 					workflow.setTransitionState(Level.RUNNING);
-					getConfiguration().getProvider().getWorkflowManager().updateWorkflow(transactionId, workflow);
+					getConfiguration().getProvider().getWorkflowManager().updateWorkflow(getConfig().getConnectionId(), transactionId, workflow);
 				}
 				return null;
 			}
@@ -319,13 +319,13 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 				@Override
 				public Void call(String transactionId) throws Exception {
 					WorkflowManager workflowManager = getConfig().getProvider().getWorkflowManager();
-					workflowManager.updateTransition(transactionId, newInstance);
-					workflowManager.updateWorkflow(transactionId, workflow);
+					workflowManager.updateTransition(getConfig().getConnectionId(), transactionId, newInstance);
+					workflowManager.updateWorkflow(getConfig().getConnectionId(), transactionId, workflow);
 					if (!propertiesToCreate.isEmpty()) {
-						workflowManager.createWorkflowProperties(transactionId, propertiesToCreate);
+						workflowManager.createWorkflowProperties(getConfig().getConnectionId(), transactionId, propertiesToCreate);
 					}
 					if (!propertiesToUpdate.isEmpty()) {
-						workflowManager.updateWorkflowProperties(transactionId, propertiesToUpdate);
+						workflowManager.updateWorkflowProperties(getConfig().getConnectionId(), transactionId, propertiesToUpdate);
 					}
 					return null;
 				}
@@ -348,8 +348,8 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 				@Override
 				public Void call(String transactionId) throws Exception {
 					WorkflowManager workflowManager = getConfig().getProvider().getWorkflowManager();
-					workflowManager.updateTransition(transactionId, newInstance);
-					workflowManager.updateWorkflow(transactionId, workflow);
+					workflowManager.updateTransition(getConfig().getConnectionId(), transactionId, newInstance);
+					workflowManager.updateWorkflow(getConfig().getConnectionId(), transactionId, workflow);
 					return null;
 				}
 			});
@@ -396,7 +396,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 					@Override
 					public Void call(String transactionId) throws Exception {
 						WorkflowManager workflowManager = getConfig().getProvider().getWorkflowManager();
-						workflowManager.updateWorkflow(transactionId, workflow);
+						workflowManager.updateWorkflow(getConfig().getConnectionId(), transactionId, workflow);
 						return null;
 					}
 				});
