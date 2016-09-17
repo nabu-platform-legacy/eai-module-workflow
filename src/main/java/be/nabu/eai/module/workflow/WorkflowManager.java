@@ -33,6 +33,10 @@ import be.nabu.libs.services.vm.api.VMService;
 import be.nabu.libs.types.structure.DefinedStructure;
 import be.nabu.libs.validator.api.Validation;
 
+// Note: the workflow manager _must_ add references to its own generated children
+// this is because of an odd reload bug on the server where the artifact needs to go through the reload cycle twice to reload properly: first by actually reloading the artifact iself
+// then by reloading the children and their dependencies (which includes the artifact)
+// note that for some reason on the first reload, the entry is marked as "not loaded" which is why it is bypassing the proper unloading/reloading of the children
 public class WorkflowManager extends JAXBArtifactManager<WorkflowConfiguration, Workflow> implements ArtifactRepositoryManager<Workflow> {
 
 	public WorkflowManager() {
@@ -42,6 +46,18 @@ public class WorkflowManager extends JAXBArtifactManager<WorkflowConfiguration, 
 	@Override
 	protected Workflow newInstance(String id, ResourceContainer<?> container, Repository repository) {
 		return new Workflow(id, container, repository);
+	}
+
+	@Override
+	public List<String> getReferences(Workflow artifact) throws IOException {
+		List<String> references = super.getReferences(artifact);
+		for (DefinedStructure type : artifact.getStructures().values()) {
+			references.add(type.getId());
+		}
+		for (VMService service : artifact.getMappings().values()) {
+			references.add(service.getId());
+		}
+		return references;
 	}
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
@@ -240,17 +256,19 @@ public class WorkflowManager extends JAXBArtifactManager<WorkflowConfiguration, 
 		ModifiableEntry services = EAIRepositoryUtils.getParent(parent, "services", true);
 		removeRecursively(services, entries);
 		entries.add(services);
+		entries.add(structures);
+		parent.removeChildren("services", "types");
 		return entries;
 	}
 	
 	public static void removeRecursively(ModifiableEntry parent, List<Entry> entries) {
 		List<String> toRemove = new ArrayList<String>();
 		for (Entry child : parent) {
-			entries.add(child);
-			toRemove.add(child.getName());
 			if (child instanceof ModifiableEntry) {
 				removeRecursively((ModifiableEntry) child, entries);
 			}
+			entries.add(child);
+			toRemove.add(child.getName());
 		}
 		parent.removeChildren(toRemove.toArray(new String[toRemove.size()]));
 	}

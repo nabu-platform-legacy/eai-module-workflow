@@ -30,6 +30,7 @@ import be.nabu.libs.evaluator.PathAnalyzer;
 import be.nabu.libs.evaluator.QueryParser;
 import be.nabu.libs.evaluator.types.api.TypeOperation;
 import be.nabu.libs.evaluator.types.operations.TypesOperationProvider;
+import be.nabu.libs.property.api.Value;
 import be.nabu.libs.resources.api.ResourceContainer;
 import be.nabu.libs.services.ServiceRuntime;
 import be.nabu.libs.services.api.ServiceException;
@@ -39,6 +40,7 @@ import be.nabu.libs.types.api.ComplexContent;
 import be.nabu.libs.types.api.ComplexType;
 import be.nabu.libs.types.api.Element;
 import be.nabu.libs.types.base.ComplexElementImpl;
+import be.nabu.libs.types.properties.MinOccursProperty;
 import be.nabu.libs.types.structure.DefinedStructure;
 import be.nabu.libs.types.structure.Structure;
 
@@ -60,8 +62,6 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 	private Logger logger = LoggerFactory.getLogger(getClass());
 	
 	private Map<String, TypeOperation> analyzedOperations = new HashMap<String, TypeOperation>();
-	private Map<String, WorkflowTransition> transitions = new HashMap<String, WorkflowTransition>();
-	private Map<String, WorkflowState> states = new HashMap<String, WorkflowState>();
 	// one mapping per transition
 	private Map<String, VMService> mappings = new HashMap<String, VMService>();
 	
@@ -172,11 +172,11 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 		String transactionId = UUID.randomUUID().toString();
 		try {
 			T result = callable.call(transactionId);
-			WorkflowProvider.executionContext.get().getTransactionContext().commit(transactionId);
+			WorkflowProvider.commit(transactionId);
 			return result;
 		}
 		catch (Exception e) {
-			WorkflowProvider.executionContext.get().getTransactionContext().rollback(transactionId);
+			WorkflowProvider.rollback(transactionId);
 			throw new RuntimeException(e);
 		}
 		finally {
@@ -283,27 +283,30 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 			List<WorkflowInstanceProperty> propertiesToUpdate = new ArrayList<WorkflowInstanceProperty>();
 			List<WorkflowInstanceProperty> propertiesToCreate = new ArrayList<WorkflowInstanceProperty>();
 
-			ComplexContent object = (ComplexContent) output.get("properties");
+			ComplexContent object = output == null ? null : (ComplexContent) output.get("properties");
 			if (object != null) {
 				for (Element<?> element : TypeUtils.getAllChildren(object.getType())) {
 					Object value = object.get(element.getName());
 					if (value != null) {
+						boolean found = false;
 						for (WorkflowInstanceProperty current : properties) {
 							if (current.getKey().equals(element.getName())) {
 								current.setValue(ConverterFactory.getInstance().getConverter().convert(value, String.class));
 								current.setTransitionId(newInstance.getId());
 								propertiesToUpdate.add(current);
+								found = true;
+								break;
 							}
-							else {
-								WorkflowInstanceProperty property = new WorkflowInstanceProperty();
-								property.setId(UUID.randomUUID().toString());
-								property.setWorkflowId(workflow.getId());
-								property.setTransitionId(newInstance.getId());
-								property.setKey(element.getName());
-								property.setValue(ConverterFactory.getInstance().getConverter().convert(value, String.class));
-								properties.add(property);
-								propertiesToCreate.add(property);
-							}
+						}
+						if (!found) {
+							WorkflowInstanceProperty property = new WorkflowInstanceProperty();
+							property.setId(UUID.randomUUID().toString());
+							property.setWorkflowId(workflow.getId());
+							property.setTransitionId(newInstance.getId());
+							property.setKey(element.getName());
+							property.setValue(ConverterFactory.getInstance().getConverter().convert(value, String.class));
+							properties.add(property);
+							propertiesToCreate.add(property);
 						}
 					}
 				}
@@ -374,13 +377,13 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 			history.add(newInstance);
 			ComplexContent content = getStateEvaluationType(targetState.getId()).newInstance();
 			content.set("properties", propertiesToObject(properties));
-			content.set("state", output.get("state"));
+			content.set("state", output == null ? null : output.get("state"));
 			List<WorkflowTransition> possibleTransitions = new ArrayList<WorkflowTransition>(targetState.getTransitions());
 			Collections.sort(possibleTransitions);
 			boolean foundNext = false;
 			for (WorkflowTransition possibleTransition : possibleTransitions) {
-				String query = possibleTransition.getQuery();
-				if (query != null) {
+				if (canAutomaticallyTransition(possibleTransition)) {
+					String query = possibleTransition.getQuery();
 					try {
 						if (!analyzedOperations.containsKey(query)) {
 							synchronized(analyzedOperations) {
@@ -416,6 +419,20 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 		}
 	}
 	
+	private boolean canAutomaticallyTransition(WorkflowTransition transition) {
+		if (transition.getQuery() == null) {
+			return false;
+		}
+		DefinedStructure definedStructure = getStructures().get(transition.getId());
+		for (Element<?> child : TypeUtils.getAllChildren(definedStructure)) {
+			Value<Integer> minOccurs = child.getProperty(MinOccursProperty.getInstance());
+			if (minOccurs == null || minOccurs.getValue() != 0) {
+				return false;
+			}
+		}
+		return true;
+	}
+	
 	public static WorkflowTransitionInstance getTransitionBySequence(List<WorkflowTransitionInstance> instances, int sequence) {
 		for (WorkflowTransitionInstance instance : instances) {
 			if (instance.getSequence() == sequence) {
@@ -426,39 +443,22 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 	}
 
 	public WorkflowState getStateById(String id) {
-		if (!states.containsKey(id)) {
-			try {
-				for (WorkflowState state : getConfiguration().getStates()) {
-					if (state.getId().equals(id)) {
-						return state;
-					}
-				}
-			}
-			catch (Exception e) {
-				throw new RuntimeException(e);
+		for (WorkflowState state : getConfig().getStates()) {
+			if (state.getId().equals(id)) {
+				return state;
 			}
 		}
-		return states.get(id);
+		return null;
 	}
 	
 	public WorkflowTransition getTransitionById(String id) {
-		if (!transitions.containsKey(id)) {
-			try {
-				WorkflowTransition transition = null;
-				for (WorkflowState state : getConfiguration().getStates()) {
-					WorkflowTransition potential = getTransitionById(id, state);
-					if (potential != null) {
-						transition = potential;
-						break;
-					}
-				}
-				transitions.put(id, transition);
-			}
-			catch (Exception e) {
-				throw new RuntimeException(e);
+		for (WorkflowState state : getConfig().getStates()) {
+			WorkflowTransition potential = getTransitionById(id, state);
+			if (potential != null) {
+				return potential;
 			}
 		}
-		return transitions.get(id);
+		return null;
 	}
 	
 	private WorkflowTransition getTransitionById(String id, WorkflowState state) {
