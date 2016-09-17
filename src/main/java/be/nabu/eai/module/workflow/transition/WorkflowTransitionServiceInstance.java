@@ -36,12 +36,16 @@ public class WorkflowTransitionServiceInstance implements ServiceInstance {
 		WorkflowInstance instance;
 		List<WorkflowTransitionInstance> history = new ArrayList<WorkflowTransitionInstance>();
 		List<WorkflowInstanceProperty> properties = new ArrayList<WorkflowInstanceProperty>();
+		
+		String connectionId = service.getWorkflow().getConfig().getConnection() == null ? null : service.getWorkflow().getConfig().getConnection().getId();
 		if (service.isInitial()) {
 			instance = new WorkflowInstance();
 			instance.setId(UUID.randomUUID().toString());
-			instance.setParentId((String) input.get("parentId"));
-			instance.setContextId((String) input.get("contextId"));
-			instance.setBatchId((String) input.get("batchId"));
+			if (input != null) {
+				instance.setParentId((String) input.get("parentId"));
+				instance.setContextId((String) input.get("contextId"));
+				instance.setBatchId((String) input.get("batchId"));
+			}
 			instance.setStarted(new Date());
 			instance.setDefinitionId(service.getWorkflow().getId());
 			instance.setEnvironment(service.getWorkflow().getRepository().getGroup());
@@ -51,7 +55,7 @@ public class WorkflowTransitionServiceInstance implements ServiceInstance {
 			Workflow.runTransactionally(new TransactionableAction<Void>() {
 				@Override
 				public Void call(String transactionId) throws Exception {
-					service.getWorkflow().getConfig().getProvider().getWorkflowManager().createWorkflow(service.getWorkflow().getConfig().getConnectionId(), transactionId, instance);
+					service.getWorkflow().getConfig().getProvider().getWorkflowManager().createWorkflow(connectionId, transactionId, instance);
 					return null;
 				}
 			});
@@ -62,12 +66,13 @@ public class WorkflowTransitionServiceInstance implements ServiceInstance {
 				throw new ServiceException("WORKFLOW-1", "No workflow id given");
 			}
 			WorkflowManager workflowManager = service.getWorkflow().getConfig().getProvider().getWorkflowManager();
-			instance = workflowManager.getWorkflow(service.getWorkflow().getConfig().getConnectionId(), workflowId);
-			List<WorkflowTransitionInstance> transitions = workflowManager.getTransitions(service.getWorkflow().getConfig().getConnectionId(), workflowId);
+			
+			instance = workflowManager.getWorkflow(connectionId, workflowId);
+			List<WorkflowTransitionInstance> transitions = workflowManager.getTransitions(connectionId, workflowId);
 			if (transitions != null) {
 				history.addAll(transitions);
 			}
-			List<WorkflowInstanceProperty> workflowProperties = workflowManager.getWorkflowProperties(service.getWorkflow().getConfig().getConnectionId(), workflowId);
+			List<WorkflowInstanceProperty> workflowProperties = workflowManager.getWorkflowProperties(connectionId, workflowId);
 			if (workflowProperties != null) {
 				properties.addAll(workflowProperties);
 			}

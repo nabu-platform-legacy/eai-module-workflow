@@ -2,9 +2,9 @@ package be.nabu.eai.module.workflow;
 
 import java.io.IOException;
 import java.net.URL;
-import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
@@ -13,7 +13,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-import nabu.misc.workflow.types.WorkflowInstance;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
 import javafx.event.ActionEvent;
@@ -23,6 +22,7 @@ import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.SplitPane;
 import javafx.scene.input.DataFormat;
 import javafx.scene.input.DragEvent;
@@ -37,16 +37,17 @@ import javafx.scene.layout.Pane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
+import nabu.misc.workflow.types.WorkflowInstance;
 import be.nabu.eai.developer.MainController;
 import be.nabu.eai.developer.controllers.VMServiceController;
 import be.nabu.eai.developer.managers.base.BaseArtifactGUIInstance;
-import be.nabu.eai.developer.managers.base.BasePortableGUIManager;
+import be.nabu.eai.developer.managers.base.BaseJAXBGUIManager;
 import be.nabu.eai.developer.managers.util.MovablePane;
 import be.nabu.eai.developer.managers.util.SimpleProperty;
 import be.nabu.eai.developer.managers.util.SimplePropertyUpdater;
 import be.nabu.eai.developer.util.Confirm;
-import be.nabu.eai.developer.util.EAIDeveloperUtils;
 import be.nabu.eai.developer.util.Confirm.ConfirmType;
+import be.nabu.eai.developer.util.EAIDeveloperUtils;
 import be.nabu.eai.module.services.vm.VMServiceGUIManager;
 import be.nabu.eai.module.types.structure.StructureGUIManager;
 import be.nabu.eai.module.workflow.gui.RectangleWithHooks;
@@ -74,7 +75,7 @@ import be.nabu.libs.types.structure.Structure;
 import be.nabu.libs.validator.api.ValidationMessage;
 import be.nabu.libs.validator.api.ValidationMessage.Severity;
 
-public class WorkflowGUIManager extends BasePortableGUIManager<Workflow, BaseArtifactGUIInstance<Workflow>> {
+public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration, Workflow> {
 
 	static {
 		URL resource = VMServiceGUIManager.class.getClassLoader().getResource("workflow.css");
@@ -83,18 +84,22 @@ public class WorkflowGUIManager extends BasePortableGUIManager<Workflow, BaseArt
 		}
 	}
 	
+	public WorkflowGUIManager() {
+		super("Workflow", Workflow.class, new WorkflowManager(), WorkflowConfiguration.class);
+	}
+	
 	private Map<String, RectangleWithHooks> states = new HashMap<String, RectangleWithHooks>();
 	private Map<String, List<Node>> transitions = new HashMap<String, List<Node>>();
 	private AnchorPane drawPane;
 	private Line draggingLine;
 	private AnchorPane mapPane;
 	
-	public WorkflowGUIManager() {
-		super("Workflow", Workflow.class, new WorkflowManager());
-	}
+//	public WorkflowGUIManager() {
+//		super("Workflow", Workflow.class, new WorkflowManager());
+//	}
 
 	@Override
-	public void display(MainController controller, AnchorPane pane, Workflow artifact) throws IOException, ParseException {
+	public void display(MainController controller, AnchorPane pane, Workflow artifact) {
 		SplitPane split = new SplitPane();
 
 		VBox vbox = new VBox();
@@ -102,11 +107,11 @@ public class WorkflowGUIManager extends BasePortableGUIManager<Workflow, BaseArt
 		
 		drawPane = new AnchorPane();
 		
-		for (WorkflowState state : artifact.getConfiguration().getStates()) {
+		for (WorkflowState state : artifact.getConfig().getStates()) {
 			drawState(artifact, state);
 		}
 		
-		for (WorkflowState state : artifact.getConfiguration().getStates()) {
+		for (WorkflowState state : artifact.getConfig().getStates()) {
 			Iterator<WorkflowTransition> iterator = state.getTransitions().iterator();
 			while (iterator.hasNext()) {
 				WorkflowTransition transition = iterator.next();
@@ -160,14 +165,30 @@ public class WorkflowGUIManager extends BasePortableGUIManager<Workflow, BaseArt
 			@Override
 			public void handle(ActionEvent event) {
 				if (!event.isConsumed()) {
+					SplitPane split = new SplitPane();
+					split.setOrientation(Orientation.HORIZONTAL);
+					AnchorPane left = new AnchorPane();
+					AnchorPane right = new AnchorPane();
+					
+					ScrollPane leftScrollPane = new ScrollPane();
+					leftScrollPane.setFitToHeight(true);
+					leftScrollPane.setFitToWidth(true);
+					leftScrollPane.setContent(left);
+					displayParent(right, artifact);
+					split.getItems().addAll(leftScrollPane, right);
 					mapPane.getChildren().clear();
+					mapPane.getChildren().add(split);
 					// add an editor for the transient state
 					try {
-						new StructureGUIManager().display(MainController.getInstance(), mapPane, artifact.getStructures().get("properties"));
+						new StructureGUIManager().display(MainController.getInstance(), left, artifact.getStructures().get("properties"));
 					}
 					catch (Exception e) {
 						throw new RuntimeException(e);
 					}
+					AnchorPane.setLeftAnchor(split, 0d);
+					AnchorPane.setTopAnchor(split, 0d);
+					AnchorPane.setBottomAnchor(split, 0d);
+					AnchorPane.setRightAnchor(split, 0d);
 				}
 			}
 		});
@@ -185,6 +206,22 @@ public class WorkflowGUIManager extends BasePortableGUIManager<Workflow, BaseArt
 		AnchorPane.setLeftAnchor(split, 0d);
 		AnchorPane.setRightAnchor(split, 0d);
 		pane.getChildren().add(split);
+	}
+	
+	private void displayParent(AnchorPane pane, Workflow artifact) {
+		super.display(MainController.getInstance(), pane, artifact);
+	}
+	
+	@Override
+	public Collection<Property<?>> getModifiableProperties(Workflow instance) {
+		Collection<Property<?>> modifiableProperties = super.getModifiableProperties(instance);
+		Iterator<Property<?>> iterator = modifiableProperties.iterator();
+		while (iterator.hasNext()) {
+			if (iterator.next().getName().startsWith("states")) {
+				iterator.remove();
+			}
+		}
+		return modifiableProperties;
 	}
 
 	private void drawState(final Workflow workflow, final WorkflowState state) {

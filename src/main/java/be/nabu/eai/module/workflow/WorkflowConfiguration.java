@@ -10,12 +10,13 @@ import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 import be.nabu.eai.api.InterfaceFilter;
 import be.nabu.eai.module.workflow.provider.WorkflowProvider;
 import be.nabu.eai.repository.jaxb.ArtifactXMLAdapter;
+import be.nabu.libs.artifacts.api.DataSourceProviderArtifact;
 import be.nabu.libs.services.api.DefinedService;
 
 @XmlRootElement(name = "workflow")
 public class WorkflowConfiguration {
 	
-	private String connectionId;
+	private DataSourceProviderArtifact connection;
 	private WorkflowProvider provider;
 	private List<WorkflowState> states;
 	private DefinedService permissionService, roleService, tokenValidatorService;
@@ -66,11 +67,12 @@ public class WorkflowConfiguration {
 		this.tokenValidatorService = tokenValidatorService;
 	}
 	
-	public String getConnectionId() {
-		return connectionId;
+	@XmlJavaTypeAdapter(value = ArtifactXMLAdapter.class)
+	public DataSourceProviderArtifact getConnection() {
+		return connection;
 	}
-	public void setConnectionId(String connectionId) {
-		this.connectionId = connectionId;
+	public void setConnection(DataSourceProviderArtifact connection) {
+		this.connection = connection;
 	}
 	
 }
