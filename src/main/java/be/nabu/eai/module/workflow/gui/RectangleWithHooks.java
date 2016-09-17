@@ -41,7 +41,7 @@ public class RectangleWithHooks {
 		}
 		content.prefHeightProperty().bind(container.prefHeightProperty());
 		content.prefWidthProperty().bind(container.prefWidthProperty());
-		content.setStyle("-fx-background-color: #ddffcf; -fx-border-color: #195700; -fx-border-width: 2px");
+//		content.setStyle("-fx-background-color: #ddffcf; -fx-border-color: #195700; -fx-border-width: 2px");
 		
 		container.getChildren().add(this.content);
 				

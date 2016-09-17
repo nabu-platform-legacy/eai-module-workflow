@@ -35,6 +35,7 @@ import javafx.scene.input.TransferMode;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
@@ -195,7 +196,12 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		
 		buttons.getChildren().addAll(addState, editProperties);
 		
-		vbox.getChildren().addAll(buttons, drawPane);
+		ScrollPane drawScrollPane = new ScrollPane();
+		drawScrollPane.setContent(drawPane);
+		vbox.getChildren().addAll(buttons, drawScrollPane);
+		
+		VBox.setVgrow(buttons, Priority.NEVER);
+		VBox.setVgrow(drawScrollPane, Priority.ALWAYS);
 		
 		mapPane = new AnchorPane();
 		
@@ -231,6 +237,8 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		Label label = new Label(state.getName());
 		label.getStyleClass().add("workflow-name");
 		rectangle.getContent().getChildren().add(label);
+		
+		rectangle.getContainer().prefWidthProperty().bind(label.prefWidthProperty());
 		
 		MovablePane movable = MovablePane.makeMovable(rectangle.getContainer());
 		// make sure we update position changes
@@ -437,12 +445,18 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		circle.setFill(Color.TRANSPARENT);
 		Label label = new Label(transition.getName());
 		label.getStyleClass().add("workflow-name");
-		box.getChildren().addAll(circle, label);
+		box.getChildren().addAll(circle);
 		pane.getChildren().add(box);
 		pane.setManaged(false);
 		pane.setLayoutX(transition.getX());
 		pane.setLayoutY(transition.getY());
 		shapes.add(pane);
+		
+		AnchorPane labelPane = new AnchorPane();
+		labelPane.setManaged(false);
+		labelPane.layoutXProperty().bind(circle.layoutXProperty().add(pane.layoutXProperty()).subtract(label.widthProperty().divide(2)));
+		labelPane.layoutYProperty().bind(circle.layoutYProperty().add(pane.layoutYProperty()).add(circle.radiusProperty().multiply(2)));
+		labelPane.getChildren().add(label);
 		
 		circle.addEventHandler(MouseEvent.MOUSE_CLICKED, new EventHandler<MouseEvent>() {
 			@Override
@@ -573,7 +587,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		shapes.add(line1);
 		shapes.add(line2);
 		transitions.put(transition.getId(), shapes);
-		drawPane.getChildren().addAll(line1, line2, pane);
+		drawPane.getChildren().addAll(line1, line2, pane, labelPane);
 	}
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
