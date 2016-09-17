@@ -4,7 +4,7 @@ import java.util.List;
 
 // can not directly refer to target state as this may result in circular references!!
 // must refer to the id of the target state, separate resolving
-public class WorkflowTransition {
+public class WorkflowTransition implements Comparable<WorkflowTransition> {
 	// a generated if for this state
 	private String id;
 	// the name of the state
@@ -15,6 +15,8 @@ public class WorkflowTransition {
 	private List<String> roles;
 	// query used to trigger this transition
 	private String query;
+	// the order in which the transition queries are executed, higher means later
+	private int queryOrder;
 	// the connecting circle
 	private double x, y;
 	
@@ -70,5 +72,14 @@ public class WorkflowTransition {
 	public void setY(double y) {
 		this.y = y;
 	}
-	
+	public int getQueryOrder() {
+		return queryOrder;
+	}
+	public void setQueryOrder(int queryOrder) {
+		this.queryOrder = queryOrder;
+	}
+	@Override
+	public int compareTo(WorkflowTransition o) {
+		return queryOrder - o.queryOrder;
+	}
 }

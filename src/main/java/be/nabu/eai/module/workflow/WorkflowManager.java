@@ -5,7 +5,6 @@ import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -57,9 +56,9 @@ public class WorkflowManager extends JAXBArtifactManager<WorkflowConfiguration, 
 					DefinedStructure loaded = new StructureManager().load(new WrapperEntry(entry.getRepository(), entry, (ResourceContainer<?>) child, child.getName()), messages);
 					String group;
 					String name;
-					if (child.getName().equals("global")) {
+					if (child.getName().equals("properties")) {
 						group = "types";
-						name = "global";
+						name = "properties";
 					}
 					else {
 						WorkflowState stateById = workflow.getStateById(child.getName());
@@ -148,8 +147,8 @@ public class WorkflowManager extends JAXBArtifactManager<WorkflowConfiguration, 
 		for (String id : artifact.getStructures().keySet()) {
 			String group = null;
 			String name;
-			if (id.equals("global")) {
-				name = "global";
+			if (id.equals("properties")) {
+				name = "properties";
 			}
 			else {
 				WorkflowState stateById = artifact.getStateById(id);

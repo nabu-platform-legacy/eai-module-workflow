@@ -1,12 +1,14 @@
-package be.nabu.eai.module.workflow.provider;
+package nabu.misc.workflow.types;
 
 import java.util.Date;
 
 import javax.validation.constraints.NotNull;
+import javax.xml.bind.annotation.XmlRootElement;
 
+@XmlRootElement
 public class WorkflowInstance {
 	private String id, parentId, definitionId;
-	private Date created;
+	private Date started, stopped;
 	private String stateId, batchId, contextId, environment;
 	private Level transitionState;
 	
@@ -33,11 +35,18 @@ public class WorkflowInstance {
 	}
 	
 	@NotNull
-	public Date getCreated() {
-		return created;
+	public Date getStarted() {
+		return started;
 	}
-	public void setCreated(Date created) {
-		this.created = created;
+	public void setStarted(Date started) {
+		this.started = started;
+	}
+	
+	public Date getStopped() {
+		return stopped;
+	}
+	public void setStopped(Date stopped) {
+		this.stopped = stopped;
 	}
 	
 	public String getStateId() {
@@ -78,11 +87,17 @@ public class WorkflowInstance {
 	}
 
 	public static enum Level {
+		// ongoing
 		RUNNING,
+		// waiting for external trigger, e.g. human interaction
 		WAITING,
+		// a successful termination in between automation states, this should automatically be updated to either WAITING or RUNNING
 		STOPPED,
+		// successfully concluded
 		SUCCEEDED,
+		// concluded with failure
 		FAILED,
+		// used for reverting on crash
 		REVERTED
 	}
 }

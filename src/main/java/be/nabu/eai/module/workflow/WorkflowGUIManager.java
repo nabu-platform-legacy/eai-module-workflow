@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import nabu.misc.workflow.types.WorkflowInstance;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
 import javafx.event.ActionEvent;
@@ -66,6 +67,7 @@ import be.nabu.libs.services.vm.api.VMService;
 import be.nabu.libs.services.vm.step.Sequence;
 import be.nabu.libs.types.api.ComplexType;
 import be.nabu.libs.types.base.ComplexElementImpl;
+import be.nabu.libs.types.java.BeanResolver;
 import be.nabu.libs.types.structure.DefinedStructure;
 import be.nabu.libs.types.structure.Structure;
 import be.nabu.libs.validator.api.ValidationMessage;
@@ -152,15 +154,15 @@ public class WorkflowGUIManager extends BasePortableGUIManager<Workflow, BaseArt
 			}
 		});
 		
-		Button editGlobalState = new Button("Edit Global State");
-		editGlobalState.addEventHandler(ActionEvent.ANY, new EventHandler<ActionEvent>() {
+		Button editProperties = new Button("Edit Properties");
+		editProperties.addEventHandler(ActionEvent.ANY, new EventHandler<ActionEvent>() {
 			@Override
 			public void handle(ActionEvent event) {
 				if (!event.isConsumed()) {
 					mapPane.getChildren().clear();
 					// add an editor for the transient state
 					try {
-						new StructureGUIManager().display(MainController.getInstance(), mapPane, artifact.getStructures().get("global"));
+						new StructureGUIManager().display(MainController.getInstance(), mapPane, artifact.getStructures().get("properties"));
 					}
 					catch (Exception e) {
 						throw new RuntimeException(e);
@@ -169,7 +171,7 @@ public class WorkflowGUIManager extends BasePortableGUIManager<Workflow, BaseArt
 			}
 		});
 		
-		buttons.getChildren().addAll(addState, editGlobalState);
+		buttons.getChildren().addAll(addState, editProperties);
 		
 		vbox.getChildren().addAll(buttons, drawPane);
 		
@@ -327,14 +329,15 @@ public class WorkflowGUIManager extends BasePortableGUIManager<Workflow, BaseArt
 										transition.setY(state.getY());
 										Structure input = new Structure();
 										input.setName("input");
-										input.add(new ComplexElementImpl("global", (ComplexType) workflow.getRepository().resolve(workflow.getId() + ".types.global"), input));
-										input.add(new ComplexElementImpl("state", (ComplexType) workflow.getRepository().resolve(workflow.getId() + ".types.states." + EAIRepositoryUtils.stringToField(child.getName())), input));
-										input.add(new ComplexElementImpl("transition", (ComplexType) workflow.getRepository().resolve(workflow.getId() + ".types.transitions." + EAIRepositoryUtils.stringToField(transition.getName())), input));
+										input.add(new ComplexElementImpl("workflow", (ComplexType) BeanResolver.getInstance().resolve(WorkflowInstance.class), input));
+										input.add(new ComplexElementImpl("properties", workflow.getStructures().get("properties"), input));
+										input.add(new ComplexElementImpl("state", workflow.getStructures().get(child.getId()), input));
+										input.add(new ComplexElementImpl("transition", workflow.getStructures().get(transition.getId()), input));
 										
 										Structure output = new Structure();
 										output.setName("output");
-										output.add(new ComplexElementImpl("global", (ComplexType) workflow.getRepository().resolve(workflow.getId() + ".types.global"), output));
-										output.add(new ComplexElementImpl("state", (ComplexType) workflow.getRepository().resolve(workflow.getId() + ".types.states." + EAIRepositoryUtils.stringToField(state.getName())), output));
+										output.add(new ComplexElementImpl("properties", workflow.getStructures().get("properties"), output));
+										output.add(new ComplexElementImpl("state", workflow.getStructures().get(state.getId()), output));
 										
 										Pipeline pipeline = new Pipeline(input, output);
 										SimpleVMServiceDefinition service = new SimpleVMServiceDefinition(pipeline);

@@ -1,11 +1,13 @@
-package be.nabu.eai.module.workflow.provider;
+package nabu.misc.workflow.types;
 
 import java.util.Date;
 
 import javax.validation.constraints.NotNull;
+import javax.xml.bind.annotation.XmlRootElement;
 
-import be.nabu.eai.module.workflow.provider.WorkflowInstance.Level;
+import nabu.misc.workflow.types.WorkflowInstance.Level;
 
+@XmlRootElement
 public class WorkflowTransitionInstance implements Comparable<WorkflowTransitionInstance> {
 	// the parent id is of the transition that came before
 	private String id, workflowId, parentId, definitionId;

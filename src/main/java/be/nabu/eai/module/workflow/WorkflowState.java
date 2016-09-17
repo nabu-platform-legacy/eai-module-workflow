@@ -8,10 +8,6 @@ public class WorkflowState {
 	private String id;
 	// the name of the state
 	private String name, description;
-	// whether this state is stateless... basically means there is only the workflow state, no additional state-state
-	// this means we can not use outputs from previous transitions directly for optimization
-	// but it also means we can do stuff like retry, parallel etc when a flow is in such a state
-	private boolean stateless;
 	// the possible transitions out of this state
 	private List<WorkflowTransition> transitions;
 	// visual positioning
@@ -36,12 +32,6 @@ public class WorkflowState {
 		this.description = description;
 	}
 	
-	public boolean isStateless() {
-		return stateless;
-	}
-	public void setStateless(boolean stateless) {
-		this.stateless = stateless;
-	}
 	public List<WorkflowTransition> getTransitions() {
 		if (transitions == null) {
 			transitions = new ArrayList<WorkflowTransition>();

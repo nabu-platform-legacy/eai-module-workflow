@@ -1,10 +1,12 @@
-package be.nabu.eai.module.workflow.provider;
+package nabu.misc.workflow.types;
 
 import javax.validation.constraints.NotNull;
+import javax.xml.bind.annotation.XmlRootElement;
 
 import be.nabu.libs.types.api.KeyValuePair;
 
-public class WorkflowProperty implements KeyValuePair {
+@XmlRootElement
+public class WorkflowInstanceProperty implements KeyValuePair {
 
 	private String id, workflowId, key, value, transitionId;
 

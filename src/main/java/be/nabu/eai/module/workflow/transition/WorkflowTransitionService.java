@@ -13,6 +13,8 @@ import be.nabu.libs.types.SimpleTypeWrapperFactory;
 import be.nabu.libs.types.api.ComplexType;
 import be.nabu.libs.types.base.ComplexElementImpl;
 import be.nabu.libs.types.base.SimpleElementImpl;
+import be.nabu.libs.types.base.ValueImpl;
+import be.nabu.libs.types.properties.MinOccursProperty;
 import be.nabu.libs.types.structure.Structure;
 
 public class WorkflowTransitionService implements DefinedService {
@@ -42,8 +44,7 @@ public class WorkflowTransitionService implements DefinedService {
 
 	@Override
 	public ServiceInstance newInstance() {
-		// TODO Auto-generated method stub
-		return null;
+		return new WorkflowTransitionServiceInstance(this);
 	}
 
 	@Override
@@ -61,7 +62,6 @@ public class WorkflowTransitionService implements DefinedService {
 	}
 
 	public class WorkflowTransitionServiceInterface implements ServiceInterface {
-		
 		@Override
 		public ComplexType getInputDefinition() {
 			if (input == null) {
@@ -71,6 +71,11 @@ public class WorkflowTransitionService implements DefinedService {
 						input.setName("input");
 						if (!isInitial) {
 							input.add(new SimpleElementImpl<String>("workflowId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input));
+						}
+						else {
+							input.add(new SimpleElementImpl<String>("parentId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
+							input.add(new SimpleElementImpl<String>("batchId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
+							input.add(new SimpleElementImpl<String>("contextId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
 						}
 						input.add(new ComplexElementImpl("state", (ComplexType) workflow.getRepository().resolve(workflow.getId() + ".types.states." + EAIRepositoryUtils.stringToField(fromState.getName())), input));
 						input.add(new ComplexElementImpl("transition", (ComplexType) workflow.getRepository().resolve(workflow.getId() + ".types.transitions." + EAIRepositoryUtils.stringToField(transition.getName())), input));
@@ -102,6 +107,22 @@ public class WorkflowTransitionService implements DefinedService {
 		public ServiceInterface getParent() {
 			return null;
 		}
-		
 	}
+
+	public boolean isInitial() {
+		return isInitial;
+	}
+
+	public WorkflowTransition getTransition() {
+		return transition;
+	}
+
+	public Workflow getWorkflow() {
+		return workflow;
+	}
+
+	public WorkflowState getFromState() {
+		return fromState;
+	}
+	
 }
