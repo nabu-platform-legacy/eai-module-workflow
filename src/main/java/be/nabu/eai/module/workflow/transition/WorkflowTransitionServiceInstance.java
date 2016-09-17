@@ -68,6 +68,11 @@ public class WorkflowTransitionServiceInstance implements ServiceInstance {
 			WorkflowManager workflowManager = service.getWorkflow().getConfig().getProvider().getWorkflowManager();
 			
 			instance = workflowManager.getWorkflow(connectionId, workflowId);
+			
+			if (!instance.getStateId().equals(service.getFromState().getId())) {
+				throw new ServiceException("WORKFLOW-0", "Workflow " + workflowId + " is not in the correct state to trigger this transition");
+			}
+			
 			List<WorkflowTransitionInstance> transitions = workflowManager.getTransitions(connectionId, workflowId);
 			if (transitions != null) {
 				history.addAll(transitions);

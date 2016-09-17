@@ -457,6 +457,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		labelPane.layoutXProperty().bind(circle.layoutXProperty().add(pane.layoutXProperty()).subtract(label.widthProperty().divide(2)));
 		labelPane.layoutYProperty().bind(circle.layoutYProperty().add(pane.layoutYProperty()).add(circle.radiusProperty().multiply(2)));
 		labelPane.getChildren().add(label);
+		shapes.add(labelPane);
 		
 		circle.addEventHandler(MouseEvent.MOUSE_CLICKED, new EventHandler<MouseEvent>() {
 			@Override
