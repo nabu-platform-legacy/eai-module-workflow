@@ -14,6 +14,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import javafx.beans.binding.DoubleExpression;
+import javafx.beans.property.ReadOnlyDoubleProperty;
+import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
 import javafx.event.ActionEvent;
@@ -440,9 +443,119 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 			}
 		});
 		
+		EventHandler<MouseEvent> highlightStates = new EventHandler<MouseEvent>() {
+			@Override
+			public void handle(MouseEvent arg0) {
+				states.get(state.getId()).getContent().getStyleClass().add("active-from");
+				for (WorkflowTransition transition : state.getTransitions()) {
+					for (Node shape : transitions.get(transition.getId())) {
+						if (shape instanceof Line) {
+							shape.getStyleClass().add("connectionLine-hover");
+						}
+					}
+					states.get(transition.getTargetStateId()).getContent().getStyleClass().add("active-to");
+				}
+			}
+		};
+		EventHandler<MouseEvent> unhighlightStates = new EventHandler<MouseEvent>() {
+			@Override
+			public void handle(MouseEvent arg0) {
+				states.get(state.getId()).getContent().getStyleClass().remove("active-from");
+				for (WorkflowTransition transition : state.getTransitions()) {
+					for (Node shape : transitions.get(transition.getId())) {
+						if (shape instanceof Line) {
+							shape.getStyleClass().remove("connectionLine-hover");
+						}
+					}
+					states.get(transition.getTargetStateId()).getContent().getStyleClass().remove("active-to");
+				}
+			}
+		};
+		rectangle.getContainer().addEventHandler(MouseEvent.MOUSE_ENTERED, highlightStates);
+		rectangle.getContainer().addEventHandler(MouseEvent.MOUSE_EXITED, unhighlightStates);
+		
 		drawPane.getChildren().add(rectangle.getContainer());
 		// TODO: on click > show properties of state on the right side
 		states.put(state.getId(), rectangle);
+	}
+	
+	public static class Endpoint {
+		private DoubleExpression x, y;
+
+		public Endpoint(DoubleExpression x, DoubleExpression y) {
+			this.x = x;
+			this.y = y;
+		}
+		public DoubleExpression xProperty() {
+			return x;
+		}
+		public DoubleExpression yProperty() {
+			return y;
+		}
+	}
+	
+	public static class EndpointPicker {
+		private Endpoint[] possibleBindPoints;
+		private Endpoint endpointToBind;
+		
+		private Endpoint lastWinner;
+		
+		private SimpleDoubleProperty x = new SimpleDoubleProperty();
+		private SimpleDoubleProperty y = new SimpleDoubleProperty();
+
+		public EndpointPicker(Endpoint endpointToBind, Endpoint...possibleBindPoints) {
+			this.endpointToBind = endpointToBind;
+			this.possibleBindPoints = possibleBindPoints;
+			calculate();
+			
+			ChangeListener<Number> recalculationListener = new ChangeListener<Number>() {
+				@Override
+				public void changed(ObservableValue<? extends Number> arg0, Number arg1, Number arg2) {
+					calculate();
+				}
+			};
+			endpointToBind.xProperty().addListener(recalculationListener);
+			endpointToBind.yProperty().addListener(recalculationListener);
+			
+			for (Endpoint endpoint : possibleBindPoints) {
+				endpoint.xProperty().addListener(recalculationListener);
+				endpoint.yProperty().addListener(recalculationListener);
+			}
+		}
+		
+		private void calculate() {
+			double minDistance = Double.MAX_VALUE;
+			Endpoint winner = null;
+			double x1 = endpointToBind.xProperty().get();
+			double y1 = endpointToBind.yProperty().get();
+			for (Endpoint possibleBindPoint : possibleBindPoints) {
+				double x2 = possibleBindPoint.xProperty().get();
+				double y2 = possibleBindPoint.yProperty().get();
+				double distance = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+				if (distance < minDistance) {
+					winner = possibleBindPoint;
+					minDistance = distance;
+				}
+			}
+			if (lastWinner == null || !lastWinner.equals(winner)) {
+				if (x.isBound()) {
+					x.unbind();
+				}
+				x.bind(winner.xProperty());
+				if (y.isBound()) {
+					y.unbind();
+				}
+				y.bind(winner.yProperty());
+				lastWinner = winner;
+			}
+		}
+		
+		public ReadOnlyDoubleProperty xProperty() {
+			return x;
+		}
+		public ReadOnlyDoubleProperty yProperty() {
+			return y;
+		}
 	}
 	
 	private void removeTransition(final Workflow workflow, final WorkflowState state, final WorkflowTransition transition) {
@@ -527,10 +640,18 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		Line line1 = new Line();
 		line1.eventSizeProperty().set(5);
 		// the line starts at the outgoing point of the state
-		line1.startXProperty().bind(states.get(state.getId()).rightAnchorXProperty());
-		line1.startYProperty().bind(states.get(state.getId()).rightAnchorYProperty());
-		line1.endXProperty().bind(pane.layoutXProperty());
-		line1.endYProperty().bind(pane.layoutYProperty().add(circle.layoutYProperty()).add(circle.centerYProperty()));
+		// the picker will intelligently decide which endpoint in the rectangle to bind to
+		EndpointPicker picker = getPicker(line1.endXProperty(), line1.endYProperty(), states.get(state.getId()));
+		line1.startXProperty().bind(picker.xProperty());
+		line1.startYProperty().bind(picker.yProperty());
+//		line1.startXProperty().bind(states.get(state.getId()).rightAnchorXProperty());
+//		line1.startYProperty().bind(states.get(state.getId()).rightAnchorYProperty());
+		
+		picker = getPicker(line1.startXProperty(), line1.startYProperty(), pane, circle);
+		line1.endXProperty().bind(picker.xProperty());
+		line1.endYProperty().bind(picker.yProperty());
+//		line1.endXProperty().bind(pane.layoutXProperty());
+//		line1.endYProperty().bind(pane.layoutYProperty().add(circle.layoutYProperty()).add(circle.centerYProperty()));
 		
 		// TODO: draw all transitions, add click handlers etc
 		line1.addEventHandler(KeyEvent.KEY_PRESSED, new EventHandler<KeyEvent>() {
@@ -586,10 +707,17 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		
 		Line line2 = new Line();
 		line2.eventSizeProperty().set(5);
-		line2.startXProperty().bind(pane.layoutXProperty().add(circle.radiusProperty().multiply(2)));
-		line2.startYProperty().bind(pane.layoutYProperty().add(circle.layoutYProperty()).add(circle.centerYProperty()));
-		line2.endXProperty().bind(states.get(transition.getTargetStateId()).leftAnchorXProperty());
-		line2.endYProperty().bind(states.get(transition.getTargetStateId()).leftAnchorYProperty());
+		picker = getPicker(line2.endXProperty(), line2.endYProperty(), pane, circle);
+		line2.startXProperty().bind(picker.xProperty());
+		line2.startYProperty().bind(picker.yProperty());
+//		line2.startXProperty().bind(pane.layoutXProperty().add(circle.radiusProperty().multiply(2)));
+//		line2.startYProperty().bind(pane.layoutYProperty().add(circle.layoutYProperty()).add(circle.centerYProperty()));
+		
+		picker = getPicker(line2.startXProperty(), line2.startYProperty(), states.get(transition.getTargetStateId()));
+		line2.endXProperty().bind(picker.xProperty());
+		line2.endYProperty().bind(picker.yProperty());
+//		line2.endXProperty().bind(states.get(transition.getTargetStateId()).leftAnchorXProperty());
+//		line2.endYProperty().bind(states.get(transition.getTargetStateId()).leftAnchorYProperty());
 		line2.addEventHandler(KeyEvent.KEY_PRESSED, new EventHandler<KeyEvent>() {
 			@Override
 			public void handle(KeyEvent event) {
@@ -614,12 +742,53 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		List<Shape> arrow2 = EAIDeveloperUtils.drawArrow(line2, 0.5);
 		shapes.addAll(arrow2);
 		
+		EventHandler<MouseEvent> highlightStates = new EventHandler<MouseEvent>() {
+			@Override
+			public void handle(MouseEvent arg0) {
+				states.get(state.getId()).getContent().getStyleClass().add("active-from");
+				states.get(transition.getTargetStateId()).getContent().getStyleClass().add("active-to");
+				line1.getStyleClass().add("connectionLine-hover");
+				line2.getStyleClass().add("connectionLine-hover");
+			}
+		};
+		EventHandler<MouseEvent> unhighlightStates = new EventHandler<MouseEvent>() {
+			@Override
+			public void handle(MouseEvent arg0) {
+				states.get(state.getId()).getContent().getStyleClass().remove("active-from");
+				states.get(transition.getTargetStateId()).getContent().getStyleClass().remove("active-to");
+				line1.getStyleClass().remove("connectionLine-hover");
+				line2.getStyleClass().remove("connectionLine-hover");
+			}
+		};
+		line1.addEventHandler(MouseEvent.MOUSE_ENTERED, highlightStates);
+		line1.addEventHandler(MouseEvent.MOUSE_EXITED, unhighlightStates);
+		line2.addEventHandler(MouseEvent.MOUSE_ENTERED, highlightStates);
+		line2.addEventHandler(MouseEvent.MOUSE_EXITED, unhighlightStates);
+		
 		transitions.put(transition.getId(), shapes);
 		drawPane.getChildren().addAll(line1, line2, pane, labelPane);
 		drawPane.getChildren().addAll(arrow1);
 		drawPane.getChildren().addAll(arrow2);
 	}
 
+	private static EndpointPicker getPicker(ReadOnlyDoubleProperty x, ReadOnlyDoubleProperty y, AnchorPane pane, Circle circle) {
+		Endpoint endpoint = new Endpoint(x, y);
+		Endpoint left = new Endpoint(pane.layoutXProperty(), pane.layoutYProperty().add(circle.layoutYProperty()).add(circle.centerYProperty()));
+		Endpoint right = new Endpoint(pane.layoutXProperty().add(circle.radiusProperty().multiply(2)), pane.layoutYProperty().add(circle.layoutYProperty()).add(circle.centerYProperty()));
+		Endpoint top = new Endpoint(pane.layoutXProperty().add(circle.radiusProperty()), pane.layoutYProperty());
+		Endpoint bottom = new Endpoint(pane.layoutXProperty().add(circle.radiusProperty()), pane.layoutYProperty().add(circle.radiusProperty().multiply(2)));
+		return new EndpointPicker(endpoint, left, right, top, bottom);
+	}
+	
+	public static EndpointPicker getPicker(ReadOnlyDoubleProperty x, ReadOnlyDoubleProperty y, RectangleWithHooks rectangle) {
+		Endpoint endpoint = new Endpoint(x, y);
+		Endpoint bottom = new Endpoint(rectangle.bottomAnchorXProperty(), rectangle.bottomAnchorYProperty());
+		Endpoint top = new Endpoint(rectangle.topAnchorXProperty(), rectangle.topAnchorYProperty());
+		Endpoint left = new Endpoint(rectangle.leftAnchorXProperty(), rectangle.leftAnchorYProperty());
+		Endpoint right = new Endpoint(rectangle.rightAnchorXProperty(), rectangle.rightAnchorYProperty());
+		return new EndpointPicker(endpoint, bottom, top, left, right);
+	}
+	
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	public static SimplePropertyUpdater createUpdater(Object object, String...blacklisted) {
 		List<String> blacklist = Arrays.asList(blacklisted);
