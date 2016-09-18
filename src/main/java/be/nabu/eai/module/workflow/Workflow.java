@@ -264,6 +264,8 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 		WorkflowTransitionInstance newInstance = new WorkflowTransitionInstance();
 		newInstance.setId(UUID.randomUUID().toString());
 		newInstance.setDefinitionId(transition.getId());
+		newInstance.setFromStateId(workflow.getStateId());
+		newInstance.setToStateId(transition.getTargetStateId());
 
 		if (principal != null) {
 			newInstance.setActorId(principal.getName());

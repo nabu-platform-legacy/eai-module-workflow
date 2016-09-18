@@ -9,7 +9,7 @@ import javax.xml.bind.annotation.XmlType;
 import nabu.misc.workflow.types.WorkflowInstance.Level;
 
 @XmlRootElement
-@XmlType(propOrder = { "id", "definitionId", "workflowId", "parentId", "actorId", "systemId", "started", "stopped", "log", "errorLog", "errorCode", "sequence", "transitionState" })
+@XmlType(propOrder = { "id", "definitionId", "workflowId", "parentId", "actorId", "systemId", "started", "stopped", "log", "errorLog", "errorCode", "sequence", "transitionState", "fromStateId", "toStateId" })
 public class WorkflowTransitionInstance implements Comparable<WorkflowTransitionInstance> {
 	// the parent id is of the transition that came before
 	private String id, workflowId, parentId, definitionId;
@@ -25,6 +25,8 @@ public class WorkflowTransitionInstance implements Comparable<WorkflowTransition
 	private int sequence;
 	// the state the transition ended in
 	private Level transitionState;
+	// the state ids involved
+	private String fromStateId, toStateId;
 	
 	@NotNull
 	public String getId() {
@@ -124,6 +126,18 @@ public class WorkflowTransitionInstance implements Comparable<WorkflowTransition
 	@Override
 	public int compareTo(WorkflowTransitionInstance o) {
 		return sequence - o.sequence;
+	}
+	public String getFromStateId() {
+		return fromStateId;
+	}
+	public void setFromStateId(String fromStateId) {
+		this.fromStateId = fromStateId;
+	}
+	public String getToStateId() {
+		return toStateId;
+	}
+	public void setToStateId(String toStateId) {
+		this.toStateId = toStateId;
 	}
 	
 }
