@@ -39,6 +39,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
+import javafx.scene.shape.Shape;
 import nabu.misc.workflow.types.WorkflowInstance;
 import be.nabu.eai.developer.MainController;
 import be.nabu.eai.developer.controllers.VMServiceController;
@@ -607,8 +608,16 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		
 		shapes.add(line1);
 		shapes.add(line2);
+		
+		List<Shape> arrow1 = EAIDeveloperUtils.drawArrow(line1, 0.5);
+		shapes.addAll(arrow1);
+		List<Shape> arrow2 = EAIDeveloperUtils.drawArrow(line2, 0.5);
+		shapes.addAll(arrow2);
+		
 		transitions.put(transition.getId(), shapes);
 		drawPane.getChildren().addAll(line1, line2, pane, labelPane);
+		drawPane.getChildren().addAll(arrow1);
+		drawPane.getChildren().addAll(arrow2);
 	}
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
