@@ -261,14 +261,34 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		rectangle.getContent().addEventHandler(MouseEvent.MOUSE_CLICKED, new EventHandler<MouseEvent>() {
 			@Override
 			public void handle(MouseEvent event) {
+				SplitPane split = new SplitPane();
+				split.setOrientation(Orientation.HORIZONTAL);
+				AnchorPane left = new AnchorPane();
+				AnchorPane right = new AnchorPane();
+				
+				ScrollPane leftScrollPane = new ScrollPane();
+				leftScrollPane.setFitToHeight(true);
+				leftScrollPane.setFitToWidth(true);
+				leftScrollPane.setContent(left);
+				
+				SimplePropertyUpdater createUpdater = createUpdater(state, "x", "y", "transitions.*", "id", "name");
+				MainController.getInstance().showProperties(createUpdater, right, true);
+			
+				split.getItems().addAll(leftScrollPane, right);
 				mapPane.getChildren().clear();
+				mapPane.getChildren().add(split);
 				// add an editor for the transient state
 				try {
-					new StructureGUIManager().display(MainController.getInstance(), mapPane, workflow.getStructures().get(state.getId()));
+					new StructureGUIManager().display(MainController.getInstance(), left, workflow.getStructures().get(state.getId()));
 				}
 				catch (Exception e) {
 					throw new RuntimeException(e);
 				}
+				AnchorPane.setLeftAnchor(split, 0d);
+				AnchorPane.setTopAnchor(split, 0d);
+				AnchorPane.setBottomAnchor(split, 0d);
+				AnchorPane.setRightAnchor(split, 0d);
+				
 				// focus on the state for deletion if necessary
 				rectangle.getContent().requestFocus();
 				event.consume();
@@ -594,20 +614,21 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	public static SimplePropertyUpdater createUpdater(Object object, String...blacklisted) {
 		List<String> blacklist = Arrays.asList(blacklisted);
-		List<Property<?>> createProperties = BaseConfigurationGUIManager.createProperties(WorkflowTransition.class);
+		List<Property<?>> createProperties = BaseConfigurationGUIManager.createProperties(object.getClass());
 		Iterator<Property<?>> iterator = createProperties.iterator();
 		BeanInstance instance = new BeanInstance(object);
 		List<Value<?>> values = new ArrayList<Value<?>>();
-		while (iterator.hasNext()) {
+		values: while (iterator.hasNext()) {
 			Property<?> next = iterator.next();
-			if (blacklist.contains(next.getName())) {
-				iterator.remove();
-			}
-			else {
-				Object value = instance.get(next.getName());
-				if (value != null) {
-					values.add(new ValueImpl(next, value));
+			for (String blacklistedName : blacklist) {
+				if (next.getName().equals(blacklistedName) || next.getName().matches(blacklistedName)) {
+					iterator.remove();
+					continue values;
 				}
+			}
+			Object value = instance.get(next.getName());
+			if (value != null) {
+				values.add(new ValueImpl(next, value));
 			}
 		}
 		return new SimplePropertyUpdater(true, new HashSet<Property<?>>(createProperties), values.toArray(new Value[0])) {
