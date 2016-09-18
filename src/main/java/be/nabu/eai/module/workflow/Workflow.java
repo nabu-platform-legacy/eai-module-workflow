@@ -24,7 +24,12 @@ import be.nabu.eai.module.workflow.provider.WorkflowManager;
 import be.nabu.eai.module.workflow.provider.WorkflowProvider;
 import be.nabu.eai.repository.api.Repository;
 import be.nabu.eai.repository.artifacts.jaxb.JAXBArtifact;
+import be.nabu.eai.repository.util.SystemPrincipal;
 import be.nabu.libs.artifacts.api.StartableArtifact;
+import be.nabu.libs.authentication.api.PermissionHandler;
+import be.nabu.libs.authentication.api.RoleHandler;
+import be.nabu.libs.authentication.api.Token;
+import be.nabu.libs.authentication.api.TokenValidator;
 import be.nabu.libs.converter.ConverterFactory;
 import be.nabu.libs.evaluator.PathAnalyzer;
 import be.nabu.libs.evaluator.QueryParser;
@@ -34,6 +39,7 @@ import be.nabu.libs.property.api.Value;
 import be.nabu.libs.resources.api.ResourceContainer;
 import be.nabu.libs.services.ServiceRuntime;
 import be.nabu.libs.services.api.ServiceException;
+import be.nabu.libs.services.pojo.POJOUtils;
 import be.nabu.libs.services.vm.api.VMService;
 import be.nabu.libs.types.TypeUtils;
 import be.nabu.libs.types.api.ComplexContent;
@@ -108,7 +114,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 		if (getConfig().getProvider() != null && getConfig().getProvider().getConfig().getGetWorkflows() != null) {
 			WorkflowManager workflowManager = getConfig().getProvider().getWorkflowManager();
 			String connectionId = getConfig().getConnection() == null ? null : getConfig().getConnection().getId();
-			List<WorkflowInstance> runningWorkflows = workflowManager.getWorkflows(connectionId, getId(), null, Level.RUNNING);
+			List<WorkflowInstance> runningWorkflows = workflowManager.getWorkflows(connectionId, getId(), null, Level.RUNNING, null, null);
 			if (runningWorkflows != null) {
 				for (WorkflowInstance workflow : runningWorkflows) {
 					try {
@@ -220,6 +226,32 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 	}
 	
 	public void run(WorkflowInstance workflow, List<WorkflowTransitionInstance> history, List<WorkflowInstanceProperty> properties, WorkflowTransition transition, Principal principal, ComplexContent input) throws ServiceException {
+		// check if the current user is allowed to run it
+		Token token = principal instanceof Token ? (Token) principal : null;
+		TokenValidator tokenValidator = getTokenValidator();
+		if (tokenValidator != null && token != null && !tokenValidator.isValid(token)) {
+			token = null;
+		}
+		if (transition.getRoles() != null && !transition.getRoles().isEmpty()) {
+			RoleHandler roleHandler = getRoleHandler();
+			if (roleHandler != null) {
+				boolean allowed = false;
+				for (String role : transition.getRoles()) {
+					if (roleHandler.hasRole(token, role)) {
+						allowed = true;
+						break;
+					}
+				}
+				if (!allowed) {
+					throw new ServiceException("WORKFLOW-4", "The user does not have the correct role to run this transition");
+				}
+			}
+		}
+		PermissionHandler permissionHandler = getPermissionHandler();
+		if (permissionHandler != null && !permissionHandler.hasPermission(token, getId(), transition.getName())) {
+			throw new ServiceException("WORKFLOW-5", "The user does not have permission to run this transition");
+		}
+		
 		VMService transitionService = getMappings().get(transition.getId());
 		
 		if (transitionService == null) {
@@ -483,5 +515,24 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 
 	public Map<String, DefinedStructure> getStructures() {
 		return structures;
+	}
+	
+	public RoleHandler getRoleHandler() {
+		if (getConfig().getRoleService() != null) {
+			return POJOUtils.newProxy(RoleHandler.class, getConfig().getRoleService(), getRepository(), SystemPrincipal.ROOT);
+		}
+		return null;
+	}
+	public PermissionHandler getPermissionHandler() {
+		if (getConfig().getPermissionService() != null) {
+			return POJOUtils.newProxy(PermissionHandler.class, getConfig().getPermissionService(), getRepository(), SystemPrincipal.ROOT);
+		}
+		return null;
+	}
+	public TokenValidator getTokenValidator() {
+		if (getConfig().getTokenValidatorService() != null) {
+			return POJOUtils.newProxy(TokenValidator.class, getConfig().getTokenValidatorService(), getRepository(), SystemPrincipal.ROOT);
+		}
+		return null;
 	}
 }
