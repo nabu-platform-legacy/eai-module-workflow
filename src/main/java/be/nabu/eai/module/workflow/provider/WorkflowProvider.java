@@ -63,7 +63,7 @@ public class WorkflowProvider extends JAXBArtifact<WorkflowProviderConfiguration
 							getConfiguration().getCreateWorkflow(),
 							getConfiguration().getUpdateWorkflow(),
 							getConfiguration().getGetWorkflow(),
-							getConfiguration().getGetWorkflows(),
+							getConfiguration().getGetWorkflowsByTransitionState(),
 							getConfiguration().getCreateWorkflowProperties(),
 							getConfiguration().getUpdateWorkflowProperties(),
 							getConfiguration().getGetWorkflowProperties(),

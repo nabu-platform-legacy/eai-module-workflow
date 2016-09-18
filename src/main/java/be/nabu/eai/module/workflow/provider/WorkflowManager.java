@@ -17,7 +17,7 @@ public interface WorkflowManager {
 	@WebResult(name = "workflow")
 	public WorkflowInstance getWorkflow(@WebParam(name = "connectionId") String connectionId, @WebParam(name = "workflowId") @NotNull String workflowId);
 	@WebResult(name = "workflows")
-	public List<WorkflowInstance> getWorkflows(@WebParam(name = "connectionId") String connectionId, @NotNull @WebParam(name = "definitionId") String definitionId, @NotNull @WebParam(name = "transitionState") Level state);
+	public List<WorkflowInstance> getWorkflowsByTransitionState(@WebParam(name = "connectionId") String connectionId, @NotNull @WebParam(name = "definitionId") String definitionId, @NotNull @WebParam(name = "transitionState") Level state);
 	
 	public void createWorkflowProperties(@WebParam(name = "connectionId") String connectionId, @WebParam(name = "transactionId") String transactionId, @WebParam(name = "properties") List<WorkflowInstanceProperty> properties);
 	public void updateWorkflowProperties(@WebParam(name = "connectionId") String connectionId, @WebParam(name = "transactionId") String transactionId, @WebParam(name = "properties") List<WorkflowInstanceProperty> properties);
