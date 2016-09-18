@@ -105,10 +105,10 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 //	}
 	
 	public void recover() {
-		if (getConfig().getProvider() != null && getConfig().getProvider().getConfig().getGetWorkflowsByTransitionState() != null) {
+		if (getConfig().getProvider() != null && getConfig().getProvider().getConfig().getGetWorkflows() != null) {
 			WorkflowManager workflowManager = getConfig().getProvider().getWorkflowManager();
 			String connectionId = getConfig().getConnection() == null ? null : getConfig().getConnection().getId();
-			List<WorkflowInstance> runningWorkflows = workflowManager.getWorkflowsByTransitionState(connectionId, getId(), Level.RUNNING);
+			List<WorkflowInstance> runningWorkflows = workflowManager.getWorkflows(connectionId, getId(), null, Level.RUNNING);
 			if (runningWorkflows != null) {
 				for (WorkflowInstance workflow : runningWorkflows) {
 					try {

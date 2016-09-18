@@ -7,7 +7,7 @@ import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.XmlType;
 
 @XmlRootElement
-@XmlType(propOrder = { "id", "definitionId", "parentId", "batchId", "contextId", "started", "stopped", "environment", "transitionState" })
+@XmlType(propOrder = { "id", "definitionId", "parentId", "batchId", "contextId", "started", "stopped", "environment", "transitionState", "stateId" })
 public class WorkflowInstance {
 	private String id, parentId, definitionId;
 	private Date started, stopped;
