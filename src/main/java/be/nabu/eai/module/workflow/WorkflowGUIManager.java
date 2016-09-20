@@ -275,7 +275,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 				leftScrollPane.setFitToWidth(true);
 				leftScrollPane.setContent(left);
 				
-				SimplePropertyUpdater createUpdater = createUpdater(state, "x", "y", "transitions.*", "id", "name");
+				SimplePropertyUpdater createUpdater = createUpdater(state, null, "x", "y", "transitions.*", "id", "name");
 				MainController.getInstance().showProperties(createUpdater, right, true);
 			
 				split.getItems().addAll(leftScrollPane, right);
@@ -680,7 +680,20 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 				leftScrollPane.setFitToWidth(true);
 				leftScrollPane.setContent(left);
 				
-				SimplePropertyUpdater createUpdater = createUpdater(transition, "x", "y", "targetStateId", "id", "name");
+				SimplePropertyUpdater createUpdater = createUpdater(transition, new PropertyUpdaterListener() {
+					@Override
+					public boolean updateProperty(Property<?> property, Object value) {
+						if (property.getName().equals("startBatch")) {
+							if (value != null && (Boolean) value) {
+								// TODO: make sure there is a "batchId" variable in the input of the mapping service for this transition
+							}
+							else {
+								// TODO: make sure there is no "batchId" variable in the input of the mapping service
+							}
+						}
+						return true;
+					}
+				}, "x", "y", "targetStateId", "id", "name");
 				MainController.getInstance().showProperties(createUpdater, right, true);
 			
 				split.getItems().addAll(leftScrollPane, right);
@@ -790,7 +803,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 	}
 	
 	@SuppressWarnings({ "unchecked", "rawtypes" })
-	public static SimplePropertyUpdater createUpdater(Object object, String...blacklisted) {
+	public static SimplePropertyUpdater createUpdater(Object object, PropertyUpdaterListener listener, String...blacklisted) {
 		List<String> blacklist = Arrays.asList(blacklisted);
 		List<Property<?>> createProperties = BaseConfigurationGUIManager.createProperties(object.getClass());
 		Iterator<Property<?>> iterator = createProperties.iterator();
@@ -812,11 +825,20 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		return new SimplePropertyUpdater(true, new HashSet<Property<?>>(createProperties), values.toArray(new Value[0])) {
 			@Override
 			public List<ValidationMessage> updateProperty(Property<?> property, Object value) {
+				if (listener != null) {
+					if (!listener.updateProperty(property, value)) {
+						return Arrays.asList(new ValidationMessage(Severity.ERROR, "Could not update property: " + property.getName()));
+					}
+				}
 				MainController.getInstance().setChanged();
 				instance.set(property.getName(), value);
 				return super.updateProperty(property, value);
 			}
 		};
+	}
+	
+	public static interface PropertyUpdaterListener {
+		public boolean updateProperty(Property<?> property, Object value);
 	}
 	
 	@Override

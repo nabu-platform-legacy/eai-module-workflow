@@ -90,17 +90,19 @@ public class WorkflowInstance {
 	}
 
 	public static enum Level {
-		// ongoing
+		// ongoing (non-final)
 		RUNNING,
-		// waiting for external trigger, e.g. human interaction
+		// waiting for external trigger, e.g. human interaction (non-final)
 		WAITING,
-		// a successful termination in between automation states, this should automatically be updated to either WAITING or RUNNING
+		// a successful termination in between automation states, this should automatically be updated to either WAITING or RUNNING (non-final)
 		STOPPED,
-		// successfully concluded
+		// a runtime error occurred, this is a temporary state from which you can restart at some point or set to failed
+		ERROR,
+		// successfully concluded (a final state)
 		SUCCEEDED,
-		// concluded with failure
+		// the admin concluded that it will remain failed, this is a final state
 		FAILED,
-		// used for reverting on crash
+		// used for reverting on crash (non-final)
 		REVERTED
 	}
 }

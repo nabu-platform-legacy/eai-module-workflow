@@ -3,7 +3,6 @@ package be.nabu.eai.module.workflow;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.security.Principal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -225,9 +224,8 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 		return stateEvaluationStructures.get(stateId);
 	}
 	
-	public void run(WorkflowInstance workflow, List<WorkflowTransitionInstance> history, List<WorkflowInstanceProperty> properties, WorkflowTransition transition, Principal principal, ComplexContent input) throws ServiceException {
+	public void run(WorkflowInstance workflow, List<WorkflowTransitionInstance> history, List<WorkflowInstanceProperty> properties, WorkflowTransition transition, Token token, ComplexContent input) throws ServiceException {
 		// check if the current user is allowed to run it
-		Token token = principal instanceof Token ? (Token) principal : null;
 		TokenValidator tokenValidator = getTokenValidator();
 		if (tokenValidator != null && token != null && !tokenValidator.isValid(token)) {
 			token = null;
@@ -267,8 +265,8 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 		newInstance.setFromStateId(workflow.getStateId());
 		newInstance.setToStateId(transition.getTargetStateId());
 
-		if (principal != null) {
-			newInstance.setActorId(principal.getName());
+		if (token != null) {
+			newInstance.setActorId(token.getName());
 		}
 
 		int sequence = 0;
@@ -311,7 +309,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 		boolean isFinalState = targetState.getTransitions() == null || targetState.getTransitions().isEmpty();
 		ComplexContent output;
 		try {
-			ServiceRuntime serviceRuntime = new ServiceRuntime(transitionService, getRepository().newExecutionContext(principal));
+			ServiceRuntime serviceRuntime = new ServiceRuntime(transitionService, getRepository().newExecutionContext(token));
 			output = serviceRuntime.run(mapInput);
 			
 			List<WorkflowInstanceProperty> propertiesToUpdate = new ArrayList<WorkflowInstanceProperty>();
@@ -380,7 +378,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 			});
 		}
 		catch (Exception e) {
-			newInstance.setTransitionState(Level.FAILED);
+			newInstance.setTransitionState(Level.ERROR);
 			newInstance.setStopped(new Date());
 			StringWriter writer = new StringWriter();
 			PrintWriter printer = new PrintWriter(writer);
@@ -390,7 +388,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 			if (e instanceof ServiceException) {
 				newInstance.setErrorCode(((ServiceException) e).getCode());
 			}
-			workflow.setTransitionState(Level.FAILED);
+			workflow.setTransitionState(Level.ERROR);
 
 			runTransactionally(new TransactionableAction<Void>() {
 				@Override
@@ -429,7 +427,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 						Boolean value = (Boolean) analyzedOperations.get(query).evaluate(content);
 						if (value != null && value) {
 							foundNext = true;
-							run(workflow, history, properties, possibleTransition, principal, content);
+							run(workflow, history, properties, possibleTransition, token, content);
 							break;
 						}
 					}

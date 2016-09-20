@@ -1,10 +1,9 @@
 package be.nabu.eai.module.workflow.provider;
 
-import java.security.Principal;
-
 import be.nabu.eai.repository.api.Repository;
 import be.nabu.eai.repository.artifacts.jaxb.JAXBArtifact;
 import be.nabu.eai.repository.util.SystemPrincipal;
+import be.nabu.libs.authentication.api.Token;
 import be.nabu.libs.resources.api.ResourceContainer;
 import be.nabu.libs.services.ServiceRuntime;
 import be.nabu.libs.services.api.ExecutionContext;
@@ -52,9 +51,9 @@ public class WorkflowProvider extends JAXBArtifact<WorkflowProviderConfiguration
 					try {
 						manager = POJOUtils.newProxy(WorkflowManager.class, new ExecutionContextProvider() {
 								@Override
-								public ExecutionContext newExecutionContext(Principal principal) {
+								public ExecutionContext newExecutionContext(Token primary, Token...alternatives) {
 									if (executionContext.get() == null) {
-										executionContext.set(getRepository().newExecutionContext(principal));
+										executionContext.set(getRepository().newExecutionContext(primary, alternatives));
 									}
 									return executionContext.get();
 								}

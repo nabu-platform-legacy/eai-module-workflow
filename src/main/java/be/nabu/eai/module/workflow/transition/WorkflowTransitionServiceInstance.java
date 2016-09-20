@@ -83,7 +83,7 @@ public class WorkflowTransitionServiceInstance implements ServiceInstance {
 			}
 		}
 		
-		service.getWorkflow().run(instance, history, properties, service.getTransition(), executionContext.getSecurityContext().getPrincipal(), input);
+		service.getWorkflow().run(instance, history, properties, service.getTransition(), executionContext.getSecurityContext().getToken(), input);
 		
 		ComplexContent output = service.getServiceInterface().getOutputDefinition().newInstance();
 		if (service.isInitial()) {

@@ -9,7 +9,7 @@ import javax.xml.bind.annotation.XmlType;
 import nabu.misc.workflow.types.WorkflowInstance.Level;
 
 @XmlRootElement
-@XmlType(propOrder = { "id", "definitionId", "workflowId", "parentId", "actorId", "systemId", "started", "stopped", "log", "errorLog", "errorCode", "sequence", "transitionState", "fromStateId", "toStateId" })
+@XmlType(propOrder = { "id", "definitionId", "workflowId", "parentId", "actorId", "systemId", "started", "stopped", "log", "errorLog", "errorCode", "sequence", "transitionState", "fromStateId", "toStateId", "batchId" })
 public class WorkflowTransitionInstance implements Comparable<WorkflowTransitionInstance> {
 	// the parent id is of the transition that came before
 	private String id, workflowId, parentId, definitionId;
@@ -27,6 +27,10 @@ public class WorkflowTransitionInstance implements Comparable<WorkflowTransition
 	private Level transitionState;
 	// the state ids involved
 	private String fromStateId, toStateId;
+	// if this transition started a new batch, what is the id?
+	// while the batch is running this transition will be put into "WAITING" mode until the batch is resolved
+	// if the batch has no conclusion handler configured, the system will find any transition with that batch id and go from there
+	private String batchId;
 	
 	@NotNull
 	public String getId() {
@@ -139,5 +143,10 @@ public class WorkflowTransitionInstance implements Comparable<WorkflowTransition
 	public void setToStateId(String toStateId) {
 		this.toStateId = toStateId;
 	}
-	
+	public String getBatchId() {
+		return batchId;
+	}
+	public void setBatchId(String batchId) {
+		this.batchId = batchId;
+	}
 }

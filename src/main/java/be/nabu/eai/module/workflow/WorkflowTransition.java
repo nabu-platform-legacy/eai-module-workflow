@@ -17,6 +17,8 @@ public class WorkflowTransition implements Comparable<WorkflowTransition> {
 	private String query;
 	// the order in which the transition queries are executed, higher means later
 	private int queryOrder;
+	// whether or not this transition should start a batch
+	private boolean startBatch;
 	// the connecting circle
 	private double x, y;
 	
@@ -81,5 +83,11 @@ public class WorkflowTransition implements Comparable<WorkflowTransition> {
 	@Override
 	public int compareTo(WorkflowTransition o) {
 		return queryOrder - o.queryOrder;
+	}
+	public boolean isStartBatch() {
+		return startBatch;
+	}
+	public void setStartBatch(boolean startBatch) {
+		this.startBatch = startBatch;
 	}
 }
