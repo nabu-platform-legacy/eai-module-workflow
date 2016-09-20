@@ -74,8 +74,10 @@ import be.nabu.libs.services.vm.SimpleVMServiceDefinition;
 import be.nabu.libs.services.vm.api.Step;
 import be.nabu.libs.services.vm.api.VMService;
 import be.nabu.libs.services.vm.step.Sequence;
+import be.nabu.libs.types.SimpleTypeWrapperFactory;
 import be.nabu.libs.types.api.ComplexType;
 import be.nabu.libs.types.base.ComplexElementImpl;
+import be.nabu.libs.types.base.SimpleElementImpl;
 import be.nabu.libs.types.base.ValueImpl;
 import be.nabu.libs.types.java.BeanInstance;
 import be.nabu.libs.types.java.BeanResolver;
@@ -685,10 +687,18 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 					public boolean updateProperty(Property<?> property, Object value) {
 						if (property.getName().equals("startBatch")) {
 							if (value != null && (Boolean) value) {
-								// TODO: make sure there is a "batchId" variable in the input of the mapping service for this transition
+								if (workflow.getMappings().get(transition.getId()).getServiceInterface().getInputDefinition().get("batchId") == null) {
+									Structure input = (Structure) workflow.getMappings().get(transition.getId()).getPipeline().get(Pipeline.INPUT).getType();
+									input.add(new SimpleElementImpl<String>("batchId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input));
+									MainController.getInstance().setChanged();
+								}
 							}
 							else {
-								// TODO: make sure there is no "batchId" variable in the input of the mapping service
+								if (workflow.getMappings().get(transition.getId()).getServiceInterface().getInputDefinition().get("batchId") != null) {
+									Structure input = (Structure) workflow.getMappings().get(transition.getId()).getPipeline().get(Pipeline.INPUT).getType();
+									input.remove(input.get("batchId"));
+									MainController.getInstance().setChanged();
+								}
 							}
 						}
 						return true;
