@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import nabu.misc.workflow.types.WorkflowBatchInstance;
 import nabu.misc.workflow.types.WorkflowInstance;
 import nabu.misc.workflow.types.WorkflowInstance.Level;
 import nabu.misc.workflow.types.WorkflowInstanceProperty;
@@ -156,6 +157,25 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 					}
 				}
 			}
+			// revert batches if possible/necessary
+			if (getConfig().getProvider().getConfig().getGetBatches() != null) {
+				// all the batches that are still in running mode, they are not set to "WAITING" so will never autoresolve if this server was controlling the batch
+				List<WorkflowBatchInstance> batches = workflowManager.getBatches(connectionId, Level.RUNNING, null, null);
+				if (batches != null) {
+					for (WorkflowBatchInstance batch : batches) {
+						if (batch.getSystemId().equals(getRepository().getName())) {
+							batch.setState(Level.REVERTED);
+							runTransactionally(new TransactionableAction<Void>() {
+								@Override
+								public Void call(String transactionId) throws Exception {
+									workflowManager.updateBatch(connectionId, transactionId, batch);
+									return null;
+								}
+							});
+						}
+					}
+				}
+			}
 		}
 	}
 	
@@ -256,6 +276,9 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 			throw new ServiceException("WORKFLOW-2", "No transition service found for transition: " + transition.getName() + " (" + transition.getId() + ")");
 		}
 
+		WorkflowManager workflowManager = getConfig().getProvider().getWorkflowManager();
+		String connectionId = getConfig().getConnection() == null ? null : getConfig().getConnection().getId();
+		
 		Collections.sort(history);
 		
 		// we create the transition entry
@@ -281,15 +304,36 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 		newInstance.setTransitionState(Level.RUNNING);
 		newInstance.setWorkflowId(workflow.getId());
 		
+		// make sure the current transition is reflected in the history
+		history.add(newInstance);
+					
+		WorkflowBatchInstance batch;
+		// if we have a batchId in the input, create a batch
+		if (transitionService.getServiceInterface().getInputDefinition().get("batchId") != null) {
+			batch = new WorkflowBatchInstance();
+			batch.setStarted(new Date());
+			batch.setId(UUID.randomUUID().toString());
+			batch.setState(Level.RUNNING);
+			batch.setSystemId(getRepository().getName());
+			batch.setTransitionId(newInstance.getId());
+			batch.setWorkflowId(workflow.getId());
+			newInstance.setBatchId(batch.getId());
+		}
+		else {
+			batch = null;
+		}
+		
 		// persist the transition and optionally update the workflow instance
 		runTransactionally(new TransactionableAction<Void>() {
 			@Override
 			public Void call(String transactionId) throws Exception {
-				String connectionId = getConfig().getConnection() == null ? null : getConfig().getConnection().getId();
-				getConfiguration().getProvider().getWorkflowManager().createTransition(connectionId, transactionId, newInstance);
+				workflowManager.createTransition(connectionId, transactionId, newInstance);
 				if (workflow.getTransitionState() != Level.RUNNING) {
 					workflow.setTransitionState(Level.RUNNING);
-					getConfiguration().getProvider().getWorkflowManager().updateWorkflow(connectionId, transactionId, workflow);
+					workflowManager.updateWorkflow(connectionId, transactionId, workflow);
+				}
+				if (batch != null) {
+					workflowManager.createBatch(connectionId, transactionId, batch);
 				}
 				return null;
 			}
@@ -303,6 +347,10 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 		if (input != null) {
 			mapInput.set("state", input.get("state"));
 			mapInput.set("transition", input.get("transition"));
+		}
+		
+		if (batch != null) {
+			mapInput.set("batchId", batch.getId());
 		}
 		
 		WorkflowState targetState = getStateById(transition.getTargetStateId());
@@ -345,7 +393,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 			}
 			
 			newInstance.setStopped(new Date());
-			newInstance.setTransitionState(Level.SUCCEEDED);
+			newInstance.setTransitionState(batch != null ? Level.WAITING : Level.SUCCEEDED);
 			
 			workflow.setStateId(targetState.getId());
 			
@@ -363,8 +411,6 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 			runTransactionally(new TransactionableAction<Void>() {
 				@Override
 				public Void call(String transactionId) throws Exception {
-					WorkflowManager workflowManager = getConfig().getProvider().getWorkflowManager();
-					String connectionId = getConfig().getConnection() == null ? null : getConfig().getConnection().getId();
 					workflowManager.updateTransition(connectionId, transactionId, newInstance);
 					workflowManager.updateWorkflow(connectionId, transactionId, workflow);
 					if (!propertiesToCreate.isEmpty()) {
@@ -373,9 +419,31 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 					if (!propertiesToUpdate.isEmpty()) {
 						workflowManager.updateWorkflowProperties(connectionId, transactionId, propertiesToUpdate);
 					}
+					if (batch != null) {
+						batch.setCreated(new Date());
+						batch.setState(Level.WAITING);
+						workflowManager.updateBatch(connectionId, transactionId, batch);
+					}
 					return null;
 				}
 			});
+			
+			// check if the batch is already done, if so we can continue
+			if (batch != null) {
+				if (!continueBatch(batch)) {
+					return;
+				}
+				else {
+					runTransactionally(new TransactionableAction<Void>() {
+						@Override
+						public Void call(String transactionId) throws Exception {
+							newInstance.setTransitionState(Level.SUCCEEDED);
+							workflowManager.updateTransition(connectionId, transactionId, newInstance);
+							return null;
+						}
+					});
+				}
+			}
 		}
 		catch (Exception e) {
 			newInstance.setTransitionState(Level.ERROR);
@@ -393,8 +461,6 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 			runTransactionally(new TransactionableAction<Void>() {
 				@Override
 				public Void call(String transactionId) throws Exception {
-					WorkflowManager workflowManager = getConfig().getProvider().getWorkflowManager();
-					String connectionId = getConfig().getConnection() == null ? null : getConfig().getConnection().getId();
 					workflowManager.updateTransition(connectionId, transactionId, newInstance);
 					workflowManager.updateWorkflow(connectionId, transactionId, workflow);
 					return null;
@@ -405,50 +471,103 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 		
 		// continue execution
 		if (!isFinalState) {
-			// make sure the current transition is reflected in the history
-			history.add(newInstance);
-			ComplexContent content = getStateEvaluationType(targetState.getId()).newInstance();
-			content.set("properties", propertiesToObject(properties));
-			content.set("state", output == null ? null : output.get("state"));
-			List<WorkflowTransition> possibleTransitions = new ArrayList<WorkflowTransition>(targetState.getTransitions());
-			Collections.sort(possibleTransitions);
-			boolean foundNext = false;
-			for (WorkflowTransition possibleTransition : possibleTransitions) {
-				if (canAutomaticallyTransition(possibleTransition)) {
-					String query = possibleTransition.getQuery();
-					try {
-						if (!analyzedOperations.containsKey(query)) {
-							synchronized(analyzedOperations) {
-								if (!analyzedOperations.containsKey(query)) {
-									analyzedOperations.put(query, (TypeOperation) new PathAnalyzer<ComplexContent>(new TypesOperationProvider()).analyze(QueryParser.getInstance().parse(query)));
+			continueWorkflow(workflow, history, properties, token, targetState, output);
+		}
+		// if this workflow was part of a batch and it's done, let's check that batch
+		else if (workflow.getBatchId() != null) {
+			Level level = workflowManager.calculateBatchState(connectionId, workflow.getBatchId());
+			if (level == Level.STOPPED) {
+				WorkflowBatchInstance parentBatch = workflowManager.getBatch(connectionId, workflow.getBatchId());
+				if (continueBatch(parentBatch)) {
+					// need to get the state of the parent workflow, update the final transition and continue
+					WorkflowInstance parentFlow = workflowManager.getWorkflow(connectionId, parentBatch.getWorkflowId());
+					List<WorkflowTransitionInstance> parentHistory = workflowManager.getTransitions(connectionId, parentFlow.getId());
+					List<WorkflowInstanceProperty> parentProperties = workflowManager.getWorkflowProperties(connectionId, parentFlow.getId());
+					Collections.sort(parentHistory);
+					WorkflowState targetParentState = null;
+					for (WorkflowTransitionInstance transitionInstance : parentHistory) {
+						if (transitionInstance.getTransitionState() == Level.WAITING && workflow.getBatchId().equals(transitionInstance.getBatchId())) {
+							transitionInstance.setTransitionState(Level.SUCCEEDED);
+							runTransactionally(new TransactionableAction<Void>() {
+								@Override
+								public Void call(String transactionId) throws Exception {
+									workflowManager.updateTransition(connectionId, transactionId, transitionInstance);
+									return null;
 								}
-							}
-						}
-						Boolean value = (Boolean) analyzedOperations.get(query).evaluate(content);
-						if (value != null && value) {
-							foundNext = true;
-							run(workflow, history, properties, possibleTransition, token, content);
-							break;
+							});
+							Workflow parentFlowDefinition = (Workflow) getRepository().resolve(parentFlow.getDefinitionId());
+							targetParentState = parentFlowDefinition.getStateById(transitionInstance.getToStateId());
 						}
 					}
-					catch (Exception e) {
-						logger.error("There is an invalid query '" + query + "' for workflow: " + getId(), e);
-					}
+					continueWorkflow(parentFlow, parentHistory, parentProperties, token, targetParentState, null);
 				}
 			}
-			// update the workflow to WAITING
-			if (!foundNext) {
-				workflow.setTransitionState(Level.WAITING);
-				runTransactionally(new TransactionableAction<Void>() {
-					@Override
-					public Void call(String transactionId) throws Exception {
-						WorkflowManager workflowManager = getConfig().getProvider().getWorkflowManager();
-						workflowManager.updateWorkflow(getConfig().getConnection() == null ? null : getConfig().getConnection().getId(), transactionId, workflow);
-						return null;
+		}
+	}
+
+	private void continueWorkflow(WorkflowInstance workflow, List<WorkflowTransitionInstance> history, List<WorkflowInstanceProperty> properties, Token token, WorkflowState targetState, ComplexContent output) {
+		ComplexContent content = getStateEvaluationType(targetState.getId()).newInstance();
+		content.set("properties", propertiesToObject(properties));
+		content.set("state", output == null ? null : output.get("state"));
+		List<WorkflowTransition> possibleTransitions = new ArrayList<WorkflowTransition>(targetState.getTransitions());
+		Collections.sort(possibleTransitions);
+		boolean foundNext = false;
+		for (WorkflowTransition possibleTransition : possibleTransitions) {
+			if (canAutomaticallyTransition(possibleTransition)) {
+				String query = possibleTransition.getQuery();
+				try {
+					if (!analyzedOperations.containsKey(query)) {
+						synchronized(analyzedOperations) {
+							if (!analyzedOperations.containsKey(query)) {
+								analyzedOperations.put(query, (TypeOperation) new PathAnalyzer<ComplexContent>(new TypesOperationProvider()).analyze(QueryParser.getInstance().parse(query)));
+							}
+						}
 					}
-				});
+					Boolean value = (Boolean) analyzedOperations.get(query).evaluate(content);
+					if (value != null && value) {
+						foundNext = true;
+						run(workflow, history, properties, possibleTransition, token, content);
+						break;
+					}
+				}
+				catch (Exception e) {
+					logger.error("There is an invalid query '" + query + "' for workflow: " + getId(), e);
+				}
 			}
 		}
+		// update the workflow to WAITING
+		if (!foundNext) {
+			workflow.setTransitionState(Level.WAITING);
+			runTransactionally(new TransactionableAction<Void>() {
+				@Override
+				public Void call(String transactionId) throws Exception {
+					WorkflowManager workflowManager = getConfig().getProvider().getWorkflowManager();
+					workflowManager.updateWorkflow(getConfig().getConnection() == null ? null : getConfig().getConnection().getId(), transactionId, workflow);
+					return null;
+				}
+			});
+		}
+	}
+	
+	private boolean continueBatch(WorkflowBatchInstance batch) {
+		String connectionId = getConfig().getConnection() == null ? null : getConfig().getConnection().getId();
+		WorkflowManager workflowManager = getConfig().getProvider().getWorkflowManager();
+		Level batchState = workflowManager.calculateBatchState(connectionId, batch.getId());
+		if (batchState == Level.STOPPED) {
+			batch.setState(Level.SUCCEEDED);
+			return runTransactionally(new TransactionableAction<Boolean>() {
+				@Override
+				public Boolean call(String transactionId) throws Exception {
+					WorkflowManager workflowManager = getConfig().getProvider().getWorkflowManager();
+					// if we were able to start the batch
+					if (workflowManager.updateBatch(connectionId, transactionId, batch)) {
+						return true;
+					}
+					return false;
+				}
+			});
+		}
+		return false;
 	}
 	
 	private boolean canAutomaticallyTransition(WorkflowTransition transition) {

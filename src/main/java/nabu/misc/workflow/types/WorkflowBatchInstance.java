@@ -1,5 +1,69 @@
 package nabu.misc.workflow.types;
 
-public class WorkflowBatchInstance {
+import java.util.Date;
 
+import javax.xml.bind.annotation.XmlRootElement;
+import javax.xml.bind.annotation.XmlType;
+
+import nabu.misc.workflow.types.WorkflowInstance.Level;
+
+@XmlRootElement
+@XmlType(propOrder = { "id", "workflowId", "transitionId", "systemId", "started", "created", "stopped", "state" })
+public class WorkflowBatchInstance {
+	// the id of the batch and of the workflow that created the batch as well as the transition that created the batch
+	private String id, workflowId, transitionId, systemId;
+	// when the batch instance was started, when all batch children were created
+	// and when the batch was stopped
+	private Date started, created, stopped;
+	// the state of the batch
+	private Level state;
+	
+	public String getId() {
+		return id;
+	}
+	public void setId(String id) {
+		this.id = id;
+	}
+	public String getWorkflowId() {
+		return workflowId;
+	}
+	public void setWorkflowId(String workflowId) {
+		this.workflowId = workflowId;
+	}
+	public String getTransitionId() {
+		return transitionId;
+	}
+	public void setTransitionId(String transitionId) {
+		this.transitionId = transitionId;
+	}
+	public Date getStarted() {
+		return started;
+	}
+	public void setStarted(Date started) {
+		this.started = started;
+	}
+	public Date getCreated() {
+		return created;
+	}
+	public void setCreated(Date created) {
+		this.created = created;
+	}
+	public Date getStopped() {
+		return stopped;
+	}
+	public void setStopped(Date stopped) {
+		this.stopped = stopped;
+	}
+	public Level getState() {
+		return state;
+	}
+	public void setState(Level state) {
+		this.state = state;
+	}
+	public String getSystemId() {
+		return systemId;
+	}
+	public void setSystemId(String systemId) {
+		this.systemId = systemId;
+	}
 }

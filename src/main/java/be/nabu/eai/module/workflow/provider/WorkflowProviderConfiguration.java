@@ -14,7 +14,7 @@ public class WorkflowProviderConfiguration {
 	private DefinedService createWorkflow, updateWorkflow, getWorkflow, 
 		createTransition, updateTransition, getTransitions,
 		createWorkflowProperties, updateWorkflowProperties, getWorkflowProperties,
-		getWorkflows;
+		getWorkflows, createBatch, updateBatch, calculateBatchState, getBatch, getBatches;
 
 	@InterfaceFilter(implement = "be.nabu.eai.module.workflow.provider.WorkflowManager.createWorkflow")
 	@XmlJavaTypeAdapter(value = ArtifactXMLAdapter.class)
@@ -113,6 +113,51 @@ public class WorkflowProviderConfiguration {
 	}
 	public void setGetWorkflowProperties(DefinedService getWorkflowProperties) {
 		this.getWorkflowProperties = getWorkflowProperties;
+	}
+	
+	@InterfaceFilter(implement = "be.nabu.eai.module.workflow.provider.WorkflowManager.createBatch")
+	@XmlJavaTypeAdapter(value = ArtifactXMLAdapter.class)
+	public DefinedService getCreateBatch() {
+		return createBatch;
+	}
+	public void setCreateBatch(DefinedService createBatch) {
+		this.createBatch = createBatch;
+	}
+	
+	@InterfaceFilter(implement = "be.nabu.eai.module.workflow.provider.WorkflowManager.updateBatch")
+	@XmlJavaTypeAdapter(value = ArtifactXMLAdapter.class)
+	public DefinedService getUpdateBatch() {
+		return updateBatch;
+	}
+	public void setUpdateBatch(DefinedService updateBatch) {
+		this.updateBatch = updateBatch;
+	}
+	
+	@InterfaceFilter(implement = "be.nabu.eai.module.workflow.provider.WorkflowManager.calculateBatchState")
+	@XmlJavaTypeAdapter(value = ArtifactXMLAdapter.class)
+	public DefinedService getCalculateBatchState() {
+		return calculateBatchState;
+	}
+	public void setCalculateBatchState(DefinedService calculateBatchState) {
+		this.calculateBatchState = calculateBatchState;
+	}
+	
+	@InterfaceFilter(implement = "be.nabu.eai.module.workflow.provider.WorkflowManager.getBatch")
+	@XmlJavaTypeAdapter(value = ArtifactXMLAdapter.class)
+	public DefinedService getGetBatch() {
+		return getBatch;
+	}
+	public void setGetBatch(DefinedService getBatch) {
+		this.getBatch = getBatch;
+	}
+	
+	@InterfaceFilter(implement = "be.nabu.eai.module.workflow.provider.WorkflowManager.getBatches")
+	@XmlJavaTypeAdapter(value = ArtifactXMLAdapter.class)
+	public DefinedService getGetBatches() {
+		return getBatches;
+	}
+	public void setGetBatches(DefinedService getBatches) {
+		this.getBatches = getBatches;
 	}
 	
 }

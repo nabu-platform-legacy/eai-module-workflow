@@ -27,6 +27,11 @@ private static Collection<InterfaceDescription> descriptions = null;
 					descriptions.add(new InterfaceDescriptionImpl("Workflow", "Create Workflow Properties", "be.nabu.eai.module.workflow.provider.WorkflowManager.createWorkflowProperties"));
 					descriptions.add(new InterfaceDescriptionImpl("Workflow", "Update Workflow Properties", "be.nabu.eai.module.workflow.provider.WorkflowManager.updateWorkflowProperties"));
 					descriptions.add(new InterfaceDescriptionImpl("Workflow", "Get Workflow Properties", "be.nabu.eai.module.workflow.provider.WorkflowManager.getWorkflowProperties"));
+					descriptions.add(new InterfaceDescriptionImpl("Workflow", "Create Batch", "be.nabu.eai.module.workflow.provider.WorkflowManager.createBatch"));
+					descriptions.add(new InterfaceDescriptionImpl("Workflow", "Update Batch", "be.nabu.eai.module.workflow.provider.WorkflowManager.updateBatch"));
+					descriptions.add(new InterfaceDescriptionImpl("Workflow", "Calculate Batch State", "be.nabu.eai.module.workflow.provider.WorkflowManager.calculateBatchState"));
+					descriptions.add(new InterfaceDescriptionImpl("Workflow", "Get Batch", "be.nabu.eai.module.workflow.provider.WorkflowManager.getBatch"));
+					descriptions.add(new InterfaceDescriptionImpl("Workflow", "Get Batches", "be.nabu.eai.module.workflow.provider.WorkflowManager.getBatches"));
 					WorkflowManagerInterfaceLister.descriptions = descriptions;
 				}
 			}
