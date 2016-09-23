@@ -266,7 +266,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 			}
 		}
 		PermissionHandler permissionHandler = getPermissionHandler();
-		if (permissionHandler != null && !permissionHandler.hasPermission(token, getId(), transition.getName())) {
+		if (permissionHandler != null && !permissionHandler.hasPermission(token, workflow.getId(), transition.getName())) {
 			throw new ServiceException("WORKFLOW-5", "The user does not have permission to run this transition");
 		}
 		
