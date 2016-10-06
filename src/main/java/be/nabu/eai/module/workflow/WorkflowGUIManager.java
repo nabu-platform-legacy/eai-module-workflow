@@ -6,7 +6,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -47,7 +46,6 @@ import nabu.misc.workflow.types.WorkflowInstance;
 import be.nabu.eai.developer.MainController;
 import be.nabu.eai.developer.controllers.VMServiceController;
 import be.nabu.eai.developer.managers.base.BaseArtifactGUIInstance;
-import be.nabu.eai.developer.managers.base.BaseConfigurationGUIManager;
 import be.nabu.eai.developer.managers.base.BaseJAXBGUIManager;
 import be.nabu.eai.developer.managers.util.MovablePane;
 import be.nabu.eai.developer.managers.util.SimpleProperty;
@@ -55,6 +53,7 @@ import be.nabu.eai.developer.managers.util.SimplePropertyUpdater;
 import be.nabu.eai.developer.util.Confirm;
 import be.nabu.eai.developer.util.Confirm.ConfirmType;
 import be.nabu.eai.developer.util.EAIDeveloperUtils;
+import be.nabu.eai.developer.util.EAIDeveloperUtils.PropertyUpdaterListener;
 import be.nabu.eai.module.services.vm.VMServiceGUIManager;
 import be.nabu.eai.module.types.structure.StructureGUIManager;
 import be.nabu.eai.module.workflow.gui.RectangleWithHooks;
@@ -78,8 +77,6 @@ import be.nabu.libs.types.SimpleTypeWrapperFactory;
 import be.nabu.libs.types.api.ComplexType;
 import be.nabu.libs.types.base.ComplexElementImpl;
 import be.nabu.libs.types.base.SimpleElementImpl;
-import be.nabu.libs.types.base.ValueImpl;
-import be.nabu.libs.types.java.BeanInstance;
 import be.nabu.libs.types.java.BeanResolver;
 import be.nabu.libs.types.structure.DefinedStructure;
 import be.nabu.libs.types.structure.Structure;
@@ -277,7 +274,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 				leftScrollPane.setFitToWidth(true);
 				leftScrollPane.setContent(left);
 				
-				SimplePropertyUpdater createUpdater = createUpdater(state, null, "x", "y", "transitions.*", "id", "name");
+				SimplePropertyUpdater createUpdater = EAIDeveloperUtils.createUpdater(state, null, "x", "y", "transitions.*", "id", "name");
 				MainController.getInstance().showProperties(createUpdater, right, true);
 			
 				split.getItems().addAll(leftScrollPane, right);
@@ -682,7 +679,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 				leftScrollPane.setFitToWidth(true);
 				leftScrollPane.setContent(left);
 				
-				SimplePropertyUpdater createUpdater = createUpdater(transition, new PropertyUpdaterListener() {
+				SimplePropertyUpdater createUpdater = EAIDeveloperUtils.createUpdater(transition, new PropertyUpdaterListener() {
 					@Override
 					public boolean updateProperty(Property<?> property, Object value) {
 						if (property.getName().equals("startBatch")) {
@@ -810,45 +807,6 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		Endpoint left = new Endpoint(rectangle.leftAnchorXProperty(), rectangle.leftAnchorYProperty());
 		Endpoint right = new Endpoint(rectangle.rightAnchorXProperty(), rectangle.rightAnchorYProperty());
 		return new EndpointPicker(endpoint, bottom, top, left, right);
-	}
-	
-	@SuppressWarnings({ "unchecked", "rawtypes" })
-	public static SimplePropertyUpdater createUpdater(Object object, PropertyUpdaterListener listener, String...blacklisted) {
-		List<String> blacklist = Arrays.asList(blacklisted);
-		List<Property<?>> createProperties = BaseConfigurationGUIManager.createProperties(object.getClass());
-		Iterator<Property<?>> iterator = createProperties.iterator();
-		BeanInstance instance = new BeanInstance(object);
-		List<Value<?>> values = new ArrayList<Value<?>>();
-		values: while (iterator.hasNext()) {
-			Property<?> next = iterator.next();
-			for (String blacklistedName : blacklist) {
-				if (next.getName().equals(blacklistedName) || next.getName().matches(blacklistedName)) {
-					iterator.remove();
-					continue values;
-				}
-			}
-			Object value = instance.get(next.getName());
-			if (value != null) {
-				values.add(new ValueImpl(next, value));
-			}
-		}
-		return new SimplePropertyUpdater(true, new HashSet<Property<?>>(createProperties), values.toArray(new Value[0])) {
-			@Override
-			public List<ValidationMessage> updateProperty(Property<?> property, Object value) {
-				if (listener != null) {
-					if (!listener.updateProperty(property, value)) {
-						return Arrays.asList(new ValidationMessage(Severity.ERROR, "Could not update property: " + property.getName()));
-					}
-				}
-				MainController.getInstance().setChanged();
-				instance.set(property.getName(), value);
-				return super.updateProperty(property, value);
-			}
-		};
-	}
-	
-	public static interface PropertyUpdaterListener {
-		public boolean updateProperty(Property<?> property, Object value);
 	}
 	
 	@Override
