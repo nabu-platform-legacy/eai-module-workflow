@@ -244,6 +244,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		rectangle.getContainer().prefWidthProperty().bind(label.prefWidthProperty());
 		
 		MovablePane movable = MovablePane.makeMovable(rectangle.getContainer());
+		movable.setGridSize(10);
 		// make sure we update position changes
 		movable.xProperty().addListener(new ChangeListener<Number>() {
 			@Override
