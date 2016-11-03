@@ -1,5 +1,6 @@
 package be.nabu.eai.module.workflow.provider;
 
+import java.util.Date;
 import java.util.List;
 
 import javax.jws.WebParam;
@@ -18,7 +19,7 @@ public interface WorkflowManager {
 	@WebResult(name = "workflow")
 	public WorkflowInstance getWorkflow(@WebParam(name = "connectionId") String connectionId, @WebParam(name = "workflowId") @NotNull String workflowId);
 	@WebResult(name = "workflows")
-	public List<WorkflowInstance> getWorkflows(@WebParam(name = "connectionId") String connectionId, @NotNull @WebParam(name = "definitionId") String definitionId, @WebParam(name = "stateId") String stateId, @WebParam(name = "transitionState") Level state, @WebParam(name = "offset") Integer offset, @WebParam(name = "limit") Integer limit);
+	public List<WorkflowInstance> getWorkflows(@WebParam(name = "connectionId") String connectionId, @NotNull @WebParam(name = "definitionId") String definitionId, @WebParam(name = "stateId") String stateId, @WebParam(name = "transitionState") Level state, @WebParam(name = "from") Date from, @WebParam(name = "until") Date until, @WebParam(name = "offset") Integer offset, @WebParam(name = "limit") Integer limit);
 	
 	public void createWorkflowProperties(@WebParam(name = "connectionId") String connectionId, @WebParam(name = "transactionId") String transactionId, @WebParam(name = "properties") List<WorkflowInstanceProperty> properties);
 	public void updateWorkflowProperties(@WebParam(name = "connectionId") String connectionId, @WebParam(name = "transactionId") String transactionId, @WebParam(name = "properties") List<WorkflowInstanceProperty> properties);

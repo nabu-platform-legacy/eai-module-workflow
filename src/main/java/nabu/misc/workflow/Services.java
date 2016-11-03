@@ -2,6 +2,7 @@ package nabu.misc.workflow;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 
 import javax.jws.WebParam;
@@ -20,13 +21,19 @@ import be.nabu.libs.artifacts.ArtifactResolverFactory;
 import be.nabu.libs.authentication.api.RoleHandler;
 import be.nabu.libs.authentication.api.Token;
 import be.nabu.libs.authentication.api.TokenValidator;
+import be.nabu.libs.types.TypeUtils;
+import be.nabu.libs.types.api.ComplexType;
+import be.nabu.libs.types.api.Element;
+import be.nabu.libs.types.api.KeyValuePair;
+import be.nabu.libs.types.api.SimpleType;
+import be.nabu.libs.types.utils.KeyValuePairImpl;
 
 @WebService
 public class Services {
 	
 	@WebResult(name = "states")
-	public List<String> getActionableStates(@NotNull @WebParam(name = "definitionId") String definitionId, @WebParam(name = "token") Token token) {
-		List<String> states = new ArrayList<String>();
+	public List<KeyValuePair> getActionableStates(@NotNull @WebParam(name = "definitionId") String definitionId, @WebParam(name = "token") Token token) {
+		List<KeyValuePair> states = new ArrayList<KeyValuePair>();
 		Workflow resolve = (Workflow) ArtifactResolverFactory.getInstance().getResolver().resolve(definitionId);
 		if (resolve == null) {
 			throw new IllegalArgumentException("Could not find a workflow with id: " + definitionId);
@@ -45,14 +52,14 @@ public class Services {
 						}
 						for (String role : transition.getRoles()) {
 							if (roleHandler.hasRole(token, role)) {
-								states.add(state.getName());
+								states.add(new KeyValuePairImpl(state.getId(), state.getName()));
 								continue states;
 							}
 						}
 					}
 					// anonymous access to this transition
 					else {
-						states.add(state.getName());
+						states.add(new KeyValuePairImpl(state.getId(), state.getName()));
 						continue states;
 					}
 				}
@@ -99,33 +106,33 @@ public class Services {
 	}
 	
 	@WebResult(name = "workflows")
-	public List<WorkflowInstance> getWorkflowsForUser(@NotNull @WebParam(name = "definitionId") String definitionId, @NotNull @WebParam(name = "state") String state, @WebParam(name = "token") Token token, @WebParam(name = "offset") Integer offset, @WebParam(name = "limit") Integer limit) {
-		return getAnyWorkflows(definitionId, state, token, Level.WAITING, offset, limit);
+	public List<WorkflowInstance> getWorkflowsForUser(@NotNull @WebParam(name = "definitionId") String definitionId, @NotNull @WebParam(name = "stateId") String stateId, @WebParam(name = "token") Token token, @WebParam(name = "from") Date from, @WebParam(name = "until") Date until, @WebParam(name = "offset") Integer offset, @WebParam(name = "limit") Integer limit) {
+		return getAnyWorkflows(definitionId, stateId, token, Level.WAITING, from, until, offset, limit);
 	}
 
 	@WebResult(name = "workflows")
-	public List<WorkflowInstance> getWorkflows(@NotNull @WebParam(name = "definitionId") String definitionId, @WebParam(name = "state") String state, @WebParam(name = "transactionState") Level level, @WebParam(name = "offset") Integer offset, @WebParam(name = "limit") Integer limit) {
-		return getAnyWorkflows(definitionId, state, null, level, offset, limit);
+	public List<WorkflowInstance> getWorkflows(@NotNull @WebParam(name = "definitionId") String definitionId, @WebParam(name = "stateId") String stateId, @WebParam(name = "transactionState") Level level, @WebParam(name = "from") Date from, @WebParam(name = "until") Date until, @WebParam(name = "offset") Integer offset, @WebParam(name = "limit") Integer limit) {
+		return getAnyWorkflows(definitionId, stateId, null, level, from, until, offset, limit);
 	}
 	
-	private List<WorkflowInstance> getAnyWorkflows(@NotNull @WebParam(name = "definitionId") String definitionId, @WebParam(name = "state") String state, @WebParam(name = "token") Token token, @WebParam(name = "transactionState") Level level, @WebParam(name = "offset") Integer offset, @WebParam(name = "limit") Integer limit) {
+	private List<WorkflowInstance> getAnyWorkflows(@NotNull @WebParam(name = "definitionId") String definitionId, @WebParam(name = "stateId") String stateId, @WebParam(name = "token") Token token, @WebParam(name = "transactionState") Level level, @WebParam(name = "from") Date from, @WebParam(name = "until") Date until, @WebParam(name = "offset") Integer offset, @WebParam(name = "limit") Integer limit) {
 		Workflow resolve = (Workflow) ArtifactResolverFactory.getInstance().getResolver().resolve(definitionId);
 		if (resolve == null) {
 			throw new IllegalArgumentException("Could not find a workflow with id: " + definitionId);
 		}
-		if (token != null && state != null && !getActionableStates(definitionId, token).contains(state)) {
-			throw new SecurityException("The user does not have access to workflows of type '" + definitionId + "' in state '" + state + "'");
+		if (token != null && stateId != null && !getActionableStates(definitionId, token).contains(stateId)) {
+			throw new SecurityException("The user does not have access to workflows of type '" + definitionId + "' in state '" + stateId + "'");
 		}
 		WorkflowState workflowState = null;
-		if (state != null) {
+		if (stateId != null) {
 			for (WorkflowState potential : resolve.getConfig().getStates()) {
-				if (potential.getName().equals(state)) {
+				if (potential.getName().equals(stateId)) {
 					workflowState = potential;
 					break;
 				}
 			}
 			if (workflowState == null) {
-				throw new IllegalArgumentException("'" + state + "' is not a valid state for the workflow '" + definitionId + "'");
+				throw new IllegalArgumentException("'" + stateId + "' is not a valid state for the workflow '" + definitionId + "'");
 			}
 		}
 		return resolve.getConfig().getProvider().getWorkflowManager().getWorkflows(
@@ -133,8 +140,26 @@ public class Services {
 			definitionId, 
 			workflowState == null ? null : workflowState.getId(), 
 			level, 
+			from,
+			until,
 			offset, 
 			limit
 		);
+	}
+	
+	@WebResult(name = "propertyDefinitions")
+	public List<KeyValuePair> getPropertyDefinitions(@NotNull @WebParam(name = "definitionId") String definitionId) {
+		Workflow resolve = (Workflow) ArtifactResolverFactory.getInstance().getResolver().resolve(definitionId);
+		if (resolve == null) {
+			throw new IllegalArgumentException("Could not find a workflow with id: " + definitionId);
+		}
+		List<KeyValuePair> properties = new ArrayList<KeyValuePair>();
+		ComplexType propertyDefinition = resolve.getPropertyDefinition();
+		for (Element<?> element : TypeUtils.getAllChildren(propertyDefinition)) {
+			if (element.getType() instanceof SimpleType) {
+				properties.add(new KeyValuePairImpl(element.getName(), ((SimpleType<?>) element.getType()).getInstanceClass().getName()));
+			}
+		}
+		return properties;
 	}
 }
