@@ -17,6 +17,7 @@ import nabu.misc.workflow.types.WorkflowInstance.Level;
 import be.nabu.eai.module.workflow.Workflow;
 import be.nabu.eai.module.workflow.WorkflowState;
 import be.nabu.eai.module.workflow.WorkflowTransition;
+import be.nabu.eai.repository.EAIResourceRepository;
 import be.nabu.libs.artifacts.ArtifactResolverFactory;
 import be.nabu.libs.authentication.api.RoleHandler;
 import be.nabu.libs.authentication.api.Token;
@@ -32,8 +33,8 @@ import be.nabu.libs.types.utils.KeyValuePairImpl;
 public class Services {
 	
 	@WebResult(name = "states")
-	public List<KeyValuePair> getActionableStates(@NotNull @WebParam(name = "definitionId") String definitionId, @WebParam(name = "token") Token token) {
-		List<KeyValuePair> states = new ArrayList<KeyValuePair>();
+	public List<String> getActionableStates(@NotNull @WebParam(name = "definitionId") String definitionId, @WebParam(name = "token") Token token) {
+		List<String> states = new ArrayList<String>();
 		Workflow resolve = (Workflow) ArtifactResolverFactory.getInstance().getResolver().resolve(definitionId);
 		if (resolve == null) {
 			throw new IllegalArgumentException("Could not find a workflow with id: " + definitionId);
@@ -52,14 +53,14 @@ public class Services {
 						}
 						for (String role : transition.getRoles()) {
 							if (roleHandler.hasRole(token, role)) {
-								states.add(new KeyValuePairImpl(state.getId(), state.getName()));
+								states.add(state.getId());
 								continue states;
 							}
 						}
 					}
 					// anonymous access to this transition
 					else {
-						states.add(new KeyValuePairImpl(state.getId(), state.getName()));
+						states.add(state.getId());
 						continue states;
 					}
 				}
@@ -161,5 +162,17 @@ public class Services {
 			}
 		}
 		return properties;
+	}
+	
+	@WebResult(name = "definitionIds")
+	public List<String> getDefinitionIds() {
+		List<Workflow> artifacts = EAIResourceRepository.getInstance().getArtifacts(Workflow.class);
+		List<String> definitions = new ArrayList<String>();
+		if (artifacts != null) {
+			for (Workflow artifact : artifacts) {
+				definitions.add(artifact.getId());
+			}
+		}
+		return definitions;
 	}
 }
