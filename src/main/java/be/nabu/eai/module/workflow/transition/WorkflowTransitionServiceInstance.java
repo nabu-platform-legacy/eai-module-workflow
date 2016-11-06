@@ -1,5 +1,6 @@
 package be.nabu.eai.module.workflow.transition;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -43,8 +44,11 @@ public class WorkflowTransitionServiceInstance implements ServiceInstance {
 			instance.setId(UUID.randomUUID().toString());
 			if (input != null) {
 				instance.setParentId((String) input.get("parentId"));
-				instance.setContextId((String) input.get("contextId"));
+				instance.setCorrelationId((String) input.get("correlationId"));
 				instance.setBatchId((String) input.get("batchId"));
+				instance.setGroupId((String) input.get("groupId"));
+				instance.setContextId((String) input.get("contextId"));
+				instance.setUri((URI) input.get("uri"));
 			}
 			instance.setStarted(new Date());
 			instance.setDefinitionId(service.getWorkflow().getId());

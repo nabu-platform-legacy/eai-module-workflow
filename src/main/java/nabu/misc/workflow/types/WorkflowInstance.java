@@ -1,5 +1,6 @@
 package nabu.misc.workflow.types;
 
+import java.net.URI;
 import java.util.Date;
 
 import javax.validation.constraints.NotNull;
@@ -7,12 +8,13 @@ import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.XmlType;
 
 @XmlRootElement
-@XmlType(propOrder = { "id", "definitionId", "parentId", "batchId", "contextId", "started", "stopped", "environment", "transitionState", "stateId" })
+@XmlType(propOrder = { "id", "definitionId", "parentId", "batchId", "contextId", "groupId", "correlationId", "uri", "started", "stopped", "environment", "transitionState", "stateId" })
 public class WorkflowInstance {
 	private String id, parentId, definitionId;
 	private Date started, stopped;
-	private String stateId, batchId, contextId, environment;
+	private String stateId, batchId, contextId, groupId, correlationId, environment;
 	private Level transitionState;
+	private URI uri;
 	
 	@NotNull
 	public String getId() {
@@ -87,6 +89,26 @@ public class WorkflowInstance {
 	}
 	public void setTransitionState(Level transitionState) {
 		this.transitionState = transitionState;
+	}
+	
+	public String getGroupId() {
+		return groupId;
+	}
+	public void setGroupId(String groupId) {
+		this.groupId = groupId;
+	}
+	public String getCorrelationId() {
+		return correlationId;
+	}
+	public void setCorrelationId(String correlationId) {
+		this.correlationId = correlationId;
+	}
+	
+	public URI getUri() {
+		return uri;
+	}
+	public void setUri(URI uri) {
+		this.uri = uri;
 	}
 
 	public static enum Level {

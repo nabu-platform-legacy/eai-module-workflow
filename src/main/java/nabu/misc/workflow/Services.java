@@ -107,16 +107,16 @@ public class Services {
 	}
 	
 	@WebResult(name = "workflows")
-	public List<WorkflowInstance> getWorkflowsForUser(@NotNull @WebParam(name = "definitionId") String definitionId, @NotNull @WebParam(name = "stateId") String stateId, @WebParam(name = "token") Token token, @WebParam(name = "from") Date from, @WebParam(name = "until") Date until, @WebParam(name = "offset") Integer offset, @WebParam(name = "limit") Integer limit) {
-		return getAnyWorkflows(definitionId, stateId, token, Level.WAITING, from, until, offset, limit);
+	public List<WorkflowInstance> getWorkflowsForUser(@NotNull @WebParam(name = "definitionId") String definitionId, @NotNull @WebParam(name = "stateId") String stateId, @WebParam(name = "token") Token token, @WebParam(name = "from") Date from, @WebParam(name = "until") Date until, @WebParam(name = "properties") List<KeyValuePair> properties, @WebParam(name = "offset") Integer offset, @WebParam(name = "limit") Integer limit) {
+		return getAnyWorkflows(definitionId, stateId, token, Level.WAITING, from, until, properties, offset, limit);
 	}
 
 	@WebResult(name = "workflows")
-	public List<WorkflowInstance> getWorkflows(@NotNull @WebParam(name = "definitionId") String definitionId, @WebParam(name = "stateId") String stateId, @WebParam(name = "transactionState") Level level, @WebParam(name = "from") Date from, @WebParam(name = "until") Date until, @WebParam(name = "offset") Integer offset, @WebParam(name = "limit") Integer limit) {
-		return getAnyWorkflows(definitionId, stateId, null, level, from, until, offset, limit);
+	public List<WorkflowInstance> getWorkflows(@NotNull @WebParam(name = "definitionId") String definitionId, @WebParam(name = "stateId") String stateId, @WebParam(name = "transactionState") Level level, @WebParam(name = "from") Date from, @WebParam(name = "until") Date until, @WebParam(name = "properties") List<KeyValuePair> properties, @WebParam(name = "offset") Integer offset, @WebParam(name = "limit") Integer limit) {
+		return getAnyWorkflows(definitionId, stateId, null, level, from, until, properties, offset, limit);
 	}
 	
-	private List<WorkflowInstance> getAnyWorkflows(@NotNull @WebParam(name = "definitionId") String definitionId, @WebParam(name = "stateId") String stateId, @WebParam(name = "token") Token token, @WebParam(name = "transactionState") Level level, @WebParam(name = "from") Date from, @WebParam(name = "until") Date until, @WebParam(name = "offset") Integer offset, @WebParam(name = "limit") Integer limit) {
+	private List<WorkflowInstance> getAnyWorkflows(@NotNull @WebParam(name = "definitionId") String definitionId, @WebParam(name = "stateId") String stateId, @WebParam(name = "token") Token token, @WebParam(name = "transactionState") Level level, @WebParam(name = "from") Date from, @WebParam(name = "until") Date until, @WebParam(name = "properties") List<KeyValuePair> properties, @WebParam(name = "offset") Integer offset, @WebParam(name = "limit") Integer limit) {
 		Workflow resolve = (Workflow) ArtifactResolverFactory.getInstance().getResolver().resolve(definitionId);
 		if (resolve == null) {
 			throw new IllegalArgumentException("Could not find a workflow with id: " + definitionId);
@@ -143,6 +143,7 @@ public class Services {
 			level, 
 			from,
 			until,
+			properties,
 			offset, 
 			limit
 		);

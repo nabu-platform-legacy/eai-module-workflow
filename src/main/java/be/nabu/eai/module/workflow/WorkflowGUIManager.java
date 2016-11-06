@@ -1,6 +1,7 @@
 package be.nabu.eai.module.workflow;
 
 import java.io.IOException;
+import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -43,6 +44,7 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Shape;
 import nabu.misc.workflow.types.WorkflowInstance;
+import nabu.misc.workflow.types.WorkflowTransitionInstance;
 import be.nabu.eai.developer.MainController;
 import be.nabu.eai.developer.controllers.VMServiceController;
 import be.nabu.eai.developer.managers.base.BaseArtifactGUIInstance;
@@ -77,7 +79,10 @@ import be.nabu.libs.types.SimpleTypeWrapperFactory;
 import be.nabu.libs.types.api.ComplexType;
 import be.nabu.libs.types.base.ComplexElementImpl;
 import be.nabu.libs.types.base.SimpleElementImpl;
+import be.nabu.libs.types.base.ValueImpl;
 import be.nabu.libs.types.java.BeanResolver;
+import be.nabu.libs.types.properties.MaxOccursProperty;
+import be.nabu.libs.types.properties.MinOccursProperty;
 import be.nabu.libs.types.structure.DefinedStructure;
 import be.nabu.libs.types.structure.Structure;
 import be.nabu.libs.validator.api.ValidationMessage;
@@ -403,11 +408,17 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 										input.add(new ComplexElementImpl("properties", workflow.getStructures().get("properties"), input));
 										input.add(new ComplexElementImpl("state", workflow.getStructures().get(child.getId()), input));
 										input.add(new ComplexElementImpl("transition", workflow.getStructures().get(transition.getId()), input));
+										input.add(new ComplexElementImpl("history", (ComplexType) BeanResolver.getInstance().resolve(WorkflowTransitionInstance.class), input, new ValueImpl<Integer>(MaxOccursProperty.getInstance(), 0), new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
 										
 										Structure output = new Structure();
 										output.setName("output");
 										output.add(new ComplexElementImpl("properties", workflow.getStructures().get("properties"), output));
 										output.add(new ComplexElementImpl("state", workflow.getStructures().get(state.getId()), output));
+										output.add(new SimpleElementImpl<String>("contextId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), output, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
+										output.add(new SimpleElementImpl<String>("groupId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), output, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
+										output.add(new SimpleElementImpl<String>("log", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), output, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
+										output.add(new SimpleElementImpl<String>("code", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), output, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
+										output.add(new SimpleElementImpl<URI>("uri", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(URI.class), output, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
 										
 										Pipeline pipeline = new Pipeline(input, output);
 										SimpleVMServiceDefinition service = new SimpleVMServiceDefinition(pipeline);

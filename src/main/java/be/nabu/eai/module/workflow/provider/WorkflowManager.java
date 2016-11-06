@@ -7,6 +7,7 @@ import javax.jws.WebParam;
 import javax.jws.WebResult;
 import javax.validation.constraints.NotNull;
 
+import be.nabu.libs.types.api.KeyValuePair;
 import nabu.misc.workflow.types.WorkflowBatchInstance;
 import nabu.misc.workflow.types.WorkflowInstance;
 import nabu.misc.workflow.types.WorkflowInstance.Level;
@@ -19,7 +20,7 @@ public interface WorkflowManager {
 	@WebResult(name = "workflow")
 	public WorkflowInstance getWorkflow(@WebParam(name = "connectionId") String connectionId, @WebParam(name = "workflowId") @NotNull String workflowId);
 	@WebResult(name = "workflows")
-	public List<WorkflowInstance> getWorkflows(@WebParam(name = "connectionId") String connectionId, @NotNull @WebParam(name = "definitionId") String definitionId, @WebParam(name = "stateId") String stateId, @WebParam(name = "transitionState") Level state, @WebParam(name = "from") Date from, @WebParam(name = "until") Date until, @WebParam(name = "offset") Integer offset, @WebParam(name = "limit") Integer limit);
+	public List<WorkflowInstance> getWorkflows(@WebParam(name = "connectionId") String connectionId, @NotNull @WebParam(name = "definitionId") String definitionId, @WebParam(name = "stateId") String stateId, @WebParam(name = "transitionState") Level state, @WebParam(name = "from") Date from, @WebParam(name = "until") Date until, @WebParam(name = "properties") List<KeyValuePair> properties, @WebParam(name = "offset") Integer offset, @WebParam(name = "limit") Integer limit);
 	
 	public void createWorkflowProperties(@WebParam(name = "connectionId") String connectionId, @WebParam(name = "transactionId") String transactionId, @WebParam(name = "properties") List<WorkflowInstanceProperty> properties);
 	public void updateWorkflowProperties(@WebParam(name = "connectionId") String connectionId, @WebParam(name = "transactionId") String transactionId, @WebParam(name = "properties") List<WorkflowInstanceProperty> properties);

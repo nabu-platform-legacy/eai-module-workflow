@@ -3,6 +3,7 @@ package be.nabu.eai.module.workflow;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -114,7 +115,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 		if (getConfig().getProvider() != null && getConfig().getProvider().getConfig().getGetWorkflows() != null) {
 			WorkflowManager workflowManager = getConfig().getProvider().getWorkflowManager();
 			String connectionId = getConfig().getConnection() == null ? null : getConfig().getConnection().getId();
-			List<WorkflowInstance> runningWorkflows = workflowManager.getWorkflows(connectionId, getId(), null, Level.RUNNING, null, null, null, null);
+			List<WorkflowInstance> runningWorkflows = workflowManager.getWorkflows(connectionId, getId(), null, Level.RUNNING, null, null, null, null, null);
 			if (runningWorkflows != null) {
 				for (WorkflowInstance workflow : runningWorkflows) {
 					try {
@@ -287,7 +288,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 		
 		// we create the transition entry
 		WorkflowTransitionInstance newInstance = new WorkflowTransitionInstance();
-		newInstance.setId(UUID.randomUUID().toString());
+		newInstance.setId(UUID.randomUUID().toString().replace("-", ""));
 		newInstance.setDefinitionId(transition.getId());
 		newInstance.setFromStateId(workflow.getStateId());
 		newInstance.setToStateId(transition.getTargetStateId());
@@ -308,9 +309,6 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 		newInstance.setTransitionState(Level.RUNNING);
 		newInstance.setWorkflowId(workflow.getId());
 		
-		// make sure the current transition is reflected in the history
-		history.add(newInstance);
-					
 		WorkflowBatchInstance batch;
 		// if we have a batchId in the input, create a batch
 		if (transitionService.getServiceInterface().getInputDefinition().get("batchId") != null) {
@@ -347,6 +345,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 		ComplexContent mapInput = transitionService.getServiceInterface().getInputDefinition().newInstance();
 		mapInput.set("workflow", workflow);
 		mapInput.set("properties", propertiesToObject(properties));
+		mapInput.set("history", history);
 		
 		if (input != null) {
 			mapInput.set("state", input.get("state"));
@@ -395,6 +394,19 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 					}
 				}
 			}
+			String groupId = output == null ? null : (String) output.get("groupId");
+			String contextId = output == null ? null : (String) output.get("contextId");
+			
+			if (groupId != null) {
+				workflow.setGroupId(groupId);
+			}
+			if (contextId != null) {
+				workflow.setContextId(contextId);
+			}
+			
+			newInstance.setLog(output == null ? null : (String) output.get("log"));
+			newInstance.setCode(output == null ? null : (String) output.get("code"));
+			newInstance.setUri(output == null ? null : (URI) output.get("uri"));
 			
 			newInstance.setStopped(new Date());
 			newInstance.setTransitionState(batch != null ? Level.WAITING : Level.SUCCEEDED);
@@ -457,8 +469,14 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 			e.printStackTrace(printer);
 			printer.flush();
 			newInstance.setErrorLog(writer.toString());
-			if (e instanceof ServiceException) {
-				newInstance.setErrorCode(((ServiceException) e).getCode());
+			// try to find the actual structured cause
+			Throwable current = e;
+			while (current != null) {
+				if (current instanceof ServiceException) {
+					newInstance.setErrorCode(((ServiceException) current).getCode());
+					break;
+				}
+				current = current.getCause();
 			}
 			workflow.setTransitionState(Level.ERROR);
 
@@ -475,6 +493,8 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 		
 		// continue execution
 		if (!isFinalState) {
+			// make sure the current transition is reflected in the history
+			history.add(newInstance);
 			continueWorkflow(workflow, history, properties, token, targetState, output);
 		}
 		// if this workflow was part of a batch and it's done, let's check that batch

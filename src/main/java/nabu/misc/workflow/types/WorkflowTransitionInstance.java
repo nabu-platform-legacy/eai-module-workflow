@@ -1,5 +1,6 @@
 package nabu.misc.workflow.types;
 
+import java.net.URI;
 import java.util.Date;
 
 import javax.validation.constraints.NotNull;
@@ -9,7 +10,7 @@ import javax.xml.bind.annotation.XmlType;
 import nabu.misc.workflow.types.WorkflowInstance.Level;
 
 @XmlRootElement
-@XmlType(propOrder = { "id", "definitionId", "workflowId", "parentId", "actorId", "systemId", "started", "stopped", "log", "errorLog", "errorCode", "sequence", "transitionState", "fromStateId", "toStateId", "batchId" })
+@XmlType(propOrder = { "id", "definitionId", "workflowId", "parentId", "actorId", "systemId", "started", "stopped", "uri", "log", "code", "errorLog", "errorCode", "sequence", "transitionState", "fromStateId", "toStateId", "batchId" })
 public class WorkflowTransitionInstance implements Comparable<WorkflowTransitionInstance> {
 	// the parent id is of the transition that came before
 	private String id, workflowId, parentId, definitionId;
@@ -20,7 +21,7 @@ public class WorkflowTransitionInstance implements Comparable<WorkflowTransition
 	// when it started and stopped
 	private Date started, stopped;
 	// any pertinent logs
-	private String log, errorLog, errorCode;
+	private String code, log, errorLog, errorCode;
 	// the sequence number of this transition, its order in all the transitions
 	private int sequence;
 	// the state the transition ended in
@@ -31,6 +32,8 @@ public class WorkflowTransitionInstance implements Comparable<WorkflowTransition
 	// while the batch is running this transition will be put into "WAITING" mode until the batch is resolved
 	// if the batch has no conclusion handler configured, the system will find any transition with that batch id and go from there
 	private String batchId;
+	// a lot of workflows revolve around data, this allows you to log an URI reference to data relevant for this transition
+	private URI uri;
 	
 	@NotNull
 	public String getId() {
@@ -148,5 +151,17 @@ public class WorkflowTransitionInstance implements Comparable<WorkflowTransition
 	}
 	public void setBatchId(String batchId) {
 		this.batchId = batchId;
+	}
+	public String getCode() {
+		return code;
+	}
+	public void setCode(String code) {
+		this.code = code;
+	}
+	public URI getUri() {
+		return uri;
+	}
+	public void setUri(URI uri) {
+		this.uri = uri;
 	}
 }
