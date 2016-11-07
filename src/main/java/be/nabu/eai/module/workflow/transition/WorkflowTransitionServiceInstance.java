@@ -48,6 +48,7 @@ public class WorkflowTransitionServiceInstance implements ServiceInstance {
 				instance.setBatchId((String) input.get("batchId"));
 				instance.setGroupId((String) input.get("groupId"));
 				instance.setContextId((String) input.get("contextId"));
+				instance.setWorkflowType((String) input.get("workflowType"));
 				instance.setUri((URI) input.get("uri"));
 			}
 			instance.setStarted(new Date());

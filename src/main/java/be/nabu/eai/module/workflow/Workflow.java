@@ -396,12 +396,16 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 			}
 			String groupId = output == null ? null : (String) output.get("groupId");
 			String contextId = output == null ? null : (String) output.get("contextId");
+			String workflowType = output == null ? null : (String) output.get("workflowType");
 			
 			if (groupId != null) {
 				workflow.setGroupId(groupId);
 			}
 			if (contextId != null) {
 				workflow.setContextId(contextId);
+			}
+			if (workflowType != null) {
+				workflow.setWorkflowType(workflowType);
 			}
 			
 			newInstance.setLog(output == null ? null : (String) output.get("log"));

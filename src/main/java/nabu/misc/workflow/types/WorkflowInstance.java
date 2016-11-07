@@ -8,11 +8,11 @@ import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.XmlType;
 
 @XmlRootElement
-@XmlType(propOrder = { "id", "definitionId", "parentId", "batchId", "contextId", "groupId", "correlationId", "uri", "started", "stopped", "environment", "transitionState", "stateId" })
+@XmlType(propOrder = { "id", "definitionId", "parentId", "batchId", "contextId", "groupId", "correlationId", "workflowType", "uri", "started", "stopped", "environment", "transitionState", "stateId" })
 public class WorkflowInstance {
 	private String id, parentId, definitionId;
 	private Date started, stopped;
-	private String stateId, batchId, contextId, groupId, correlationId, environment;
+	private String stateId, batchId, contextId, groupId, correlationId, environment, workflowType;
 	private Level transitionState;
 	private URI uri;
 	
@@ -109,6 +109,13 @@ public class WorkflowInstance {
 	}
 	public void setUri(URI uri) {
 		this.uri = uri;
+	}
+
+	public String getWorkflowType() {
+		return workflowType;
+	}
+	public void setWorkflowType(String workflowType) {
+		this.workflowType = workflowType;
 	}
 
 	public static enum Level {
