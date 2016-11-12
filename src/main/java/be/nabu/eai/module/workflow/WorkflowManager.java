@@ -54,9 +54,9 @@ public class WorkflowManager extends JAXBArtifactManager<WorkflowConfiguration, 
 		for (DefinedStructure type : artifact.getStructures().values()) {
 			references.add(type.getId());
 		}
-		for (VMService service : artifact.getMappings().values()) {
-			references.add(service.getId());
-		}
+//		for (VMService service : artifact.getMappings().values()) {
+//			references.add(service.getId());
+//		}
 		return references;
 	}
 
