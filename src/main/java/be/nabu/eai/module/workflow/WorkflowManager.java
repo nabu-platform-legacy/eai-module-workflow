@@ -19,6 +19,7 @@ import be.nabu.eai.repository.api.Entry;
 import be.nabu.eai.repository.api.ModifiableEntry;
 import be.nabu.eai.repository.api.Repository;
 import be.nabu.eai.repository.api.ResourceEntry;
+import be.nabu.eai.repository.api.VariableRefactorArtifactManager;
 import be.nabu.eai.repository.artifacts.container.ContainerArtifactManager.WrapperEntry;
 import be.nabu.eai.repository.artifacts.container.ContainerArtifactManager.ContainerRepository;
 import be.nabu.eai.repository.managers.base.JAXBArtifactManager;
@@ -37,7 +38,7 @@ import be.nabu.libs.validator.api.Validation;
 // this is because of an odd reload bug on the server where the artifact needs to go through the reload cycle twice to reload properly: first by actually reloading the artifact iself
 // then by reloading the children and their dependencies (which includes the artifact)
 // note that for some reason on the first reload, the entry is marked as "not loaded" which is why it is bypassing the proper unloading/reloading of the children
-public class WorkflowManager extends JAXBArtifactManager<WorkflowConfiguration, Workflow> implements ArtifactRepositoryManager<Workflow> {
+public class WorkflowManager extends JAXBArtifactManager<WorkflowConfiguration, Workflow> implements ArtifactRepositoryManager<Workflow>, VariableRefactorArtifactManager<Workflow> {
 
 	public WorkflowManager() {
 		super(Workflow.class);
@@ -52,12 +53,33 @@ public class WorkflowManager extends JAXBArtifactManager<WorkflowConfiguration, 
 	public List<String> getReferences(Workflow artifact) throws IOException {
 		List<String> references = super.getReferences(artifact);
 		for (DefinedStructure type : artifact.getStructures().values()) {
-			references.add(type.getId());
+			references.addAll(StructureManager.getComplexReferences(type));
 		}
-//		for (VMService service : artifact.getMappings().values()) {
-//			references.add(service.getId());
-//		}
+		for (VMService service : artifact.getMappings().values()) {
+			references.addAll(VMServiceManager.getReferencesForStep(service.getRoot()));
+		}
 		return references;
+	}
+	
+	@Override
+	public List<Validation<?>> updateReference(Workflow artifact, String from, String to) throws IOException {
+		List<Validation<?>> results = new ArrayList<Validation<?>>();
+		for (DefinedStructure type : artifact.getStructures().values()) {
+			results.addAll(StructureManager.updateReferences(type, from, to));
+		}
+		for (VMService service : artifact.getMappings().values()) {
+			VMServiceManager.updateReferences(service.getRoot(), from, to);
+		}
+		return results;
+	}
+	
+	@Override
+	public boolean updateVariableName(Workflow artifact, Artifact type, String oldPath, String newPath) {
+		boolean updated = false;
+		for (VMService service : artifact.getMappings().values()) {
+			updated |= VMServiceManager.updateVariableName(service, oldPath, newPath);
+		}
+		return updated;
 	}
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
@@ -272,4 +294,5 @@ public class WorkflowManager extends JAXBArtifactManager<WorkflowConfiguration, 
 		}
 		parent.removeChildren(toRemove.toArray(new String[toRemove.size()]));
 	}
+
 }

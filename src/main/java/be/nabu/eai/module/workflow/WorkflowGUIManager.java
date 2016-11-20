@@ -155,11 +155,17 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 							WorkflowState state = new WorkflowState();
 							state.setId(UUID.randomUUID().toString());
 							state.setName(name);
+							if (lastStateId != null) {
+								WorkflowState stateById = artifact.getStateById(lastStateId);
+								state.setX(stateById.getX() + 200);
+								state.setY(stateById.getY());
+							}
 							artifact.getConfig().getStates().add(state);
 							DefinedStructure value = new DefinedStructure();
 							value.setName("state");
 							value.setId(artifact.getId() + ".types.states." + EAIRepositoryUtils.stringToField(state.getName()));
 							artifact.getStructures().put(state.getId(), value);
+							lastStateId = state.getId();
 							((WorkflowManager) getArtifactManager()).refreshChildren((ModifiableEntry) artifact.getRepository().getEntry(artifact.getId()), artifact);
 							drawState(artifact, state);
 							MainController.getInstance().setChanged();
@@ -237,6 +243,8 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		}
 		return modifiableProperties;
 	}
+	
+	private String lastStateId;
 
 	private void drawState(final Workflow workflow, final WorkflowState state) {
 //		Paint.valueOf("#ddffcf"), Paint.valueOf("#195700")
@@ -270,6 +278,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		rectangle.getContent().addEventHandler(MouseEvent.MOUSE_CLICKED, new EventHandler<MouseEvent>() {
 			@Override
 			public void handle(MouseEvent event) {
+				lastStateId = state.getId();
 				SplitPane split = new SplitPane();
 				split.setOrientation(Orientation.HORIZONTAL);
 				AnchorPane left = new AnchorPane();
@@ -389,7 +398,6 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 								transition.setTargetStateId(state.getId());
 								transition.setName(name);
 								
-								
 								for (WorkflowState child : workflow.getConfig().getStates()) {
 									if (child.getId().equals(content)) {
 										child.getTransitions().add(transition);
@@ -400,8 +408,10 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 										workflow.getStructures().put(transition.getId(), value);
 										((WorkflowManager) getArtifactManager()).refreshChildren((ModifiableEntry) workflow.getRepository().getEntry(workflow.getId()), workflow);
 
-										transition.setX(state.getX() + ((child.getX() - state.getX()) / 2));
-										transition.setY(state.getY());
+										RectangleWithHooks rectangleWithHooks = states.get(state.getId());
+										transition.setX(state.getX() + rectangleWithHooks.getContent().getWidth() + ((child.getX() - (state.getX() + rectangleWithHooks.getContent().getWidth())) / 2));
+										transition.setY(state.getY() + (rectangleWithHooks.getContent().getHeight() / 2) - 5);
+
 										Structure input = new Structure();
 										input.setName("input");
 										input.add(new ComplexElementImpl("workflow", (ComplexType) BeanResolver.getInstance().resolve(WorkflowInstance.class), input));
