@@ -32,6 +32,14 @@ import be.nabu.libs.types.utils.KeyValuePairImpl;
 @WebService
 public class Services {
 	
+	public void recover(@NotNull @WebParam(name = "definitionId") String definitionId) {
+		Workflow resolve = (Workflow) ArtifactResolverFactory.getInstance().getResolver().resolve(definitionId);
+		if (resolve == null) {
+			throw new IllegalArgumentException("Could not find a workflow with id: " + definitionId);
+		}
+		resolve.recover();
+	}
+	
 	@WebResult(name = "states")
 	public List<String> getActionableStates(@NotNull @WebParam(name = "definitionId") String definitionId, @WebParam(name = "token") Token token) {
 		List<String> states = new ArrayList<String>();

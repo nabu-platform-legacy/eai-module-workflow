@@ -1,6 +1,5 @@
 package be.nabu.eai.module.workflow;
 
-import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.URI;
@@ -26,7 +25,6 @@ import be.nabu.eai.module.workflow.provider.WorkflowProvider;
 import be.nabu.eai.repository.api.Repository;
 import be.nabu.eai.repository.artifacts.jaxb.JAXBArtifact;
 import be.nabu.eai.repository.util.SystemPrincipal;
-import be.nabu.libs.artifacts.api.StartableArtifact;
 import be.nabu.libs.authentication.api.PermissionHandler;
 import be.nabu.libs.authentication.api.RoleHandler;
 import be.nabu.libs.authentication.api.Token;
@@ -62,10 +60,8 @@ import be.nabu.libs.types.structure.Structure;
 
 // TODO: add security checks for transitions
 // TODO: can add a service runtime tracker that intercepts steps (and descriptions etc?) and builds a log file for each transition
-public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements StartableArtifact {
+public class Workflow extends JAXBArtifact<WorkflowConfiguration> {
 
-	private boolean started;
-	
 	private Logger logger = LoggerFactory.getLogger(getClass());
 	
 	private Map<String, TypeOperation> analyzedOperations = new HashMap<String, TypeOperation>();
@@ -183,15 +179,6 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 	public boolean isStateless(String stateId) {
 		DefinedStructure definedStructure = getStructures().get(stateId);
 		return definedStructure == null || !TypeUtils.getAllChildren(definedStructure).iterator().hasNext();
-	}
-	
-	// retry any ongoing flows from this server
-	@Override
-	public void start() throws IOException {
-		if (!started) {
-			started = true;
-			recover();
-		}
 	}
 	
 	public static <T> T runTransactionally(TransactionableAction<T> callable) {
@@ -649,11 +636,6 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Sta
 			}
 		}
 		return null;
-	}
-	
-	@Override
-	public boolean isStarted() {
-		return started;
 	}
 
 	public Map<String, VMService> getMappings() {

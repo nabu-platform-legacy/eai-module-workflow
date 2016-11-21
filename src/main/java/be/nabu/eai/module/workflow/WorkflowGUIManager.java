@@ -689,6 +689,9 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 				}
 			}
 		});
+		
+		Line line2 = new Line();
+		
 		line1.addEventHandler(MouseEvent.MOUSE_CLICKED, new EventHandler<MouseEvent>() {
 			@Override
 			public void handle(MouseEvent event) {
@@ -721,6 +724,24 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 								}
 							}
 						}
+						if (property.getName().equals("query")) {
+							if (value != null && !((String) value).trim().isEmpty()) {
+								if (!line1.getStyleClass().contains("indexQueryLine")) {
+									line1.getStyleClass().add("indexQueryLine");
+								}
+								if (!line2.getStyleClass().contains("indexQueryLine")) {
+									line2.getStyleClass().add("indexQueryLine");
+								}
+							}
+							else {
+								if (line1.getStyleClass().contains("indexQueryLine")) {
+									line1.getStyleClass().remove("indexQueryLine");
+								}
+								if (line2.getStyleClass().contains("indexQueryLine")) {
+									line2.getStyleClass().remove("indexQueryLine");
+								}
+							}
+						}
 						return true;
 					}
 				}, "x", "y", "targetStateId", "id", "name");
@@ -748,7 +769,10 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		});
 		line1.getStyleClass().add("connectionLine");
 		
-		Line line2 = new Line();
+		if (transition.getQuery() != null) {
+			line1.getStyleClass().add("indexQueryLine");
+		}
+		
 		line2.eventSizeProperty().set(5);
 		picker = getPicker(line2.endXProperty(), line2.endYProperty(), pane, circle);
 		line2.startXProperty().bind(picker.xProperty());
@@ -776,6 +800,10 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 			}
 		});
 		line2.getStyleClass().add("connectionLine");
+		
+		if (transition.getQuery() != null) {
+			line2.getStyleClass().add("indexQueryLine");
+		}
 		
 		shapes.add(line1);
 		shapes.add(line2);

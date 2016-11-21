@@ -1,3 +1,4 @@
+/*
 .state {
 	-fx-background-color: #ffffc6;
 	-fx-border-color: #d0d000;
@@ -16,6 +17,34 @@
 
 .active-to {
 	-fx-background-color: #ffaea8;
+	-fx-border-color: #9c0a00;
+}
+
+.connectionLine-hover {
+	-fx-stroke: #FF8000;
+}
+*/
+
+.state {
+	-fx-background-color: white;
+	-fx-border-color: #5c5c5c;
+	-fx-border-width: 1px;
+	-fx-border-radius: 10 10 10 10;
+	-fx-background-radius: 10 10 10 10;
+}
+
+.workflow-name {
+	-fx-padding: 12px;
+	-fx-text-alignment: center;
+}
+
+.active-from {
+	-fx-background-color: #f2fff2;
+	-fx-border-color: #00b300;
+}
+
+.active-to {
+	-fx-background-color: #ffedec;
 	-fx-border-color: #9c0a00;
 }
 
