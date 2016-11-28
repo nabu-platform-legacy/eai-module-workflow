@@ -675,24 +675,9 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 //		line1.endXProperty().bind(pane.layoutXProperty());
 //		line1.endYProperty().bind(pane.layoutYProperty().add(circle.layoutYProperty()).add(circle.centerYProperty()));
 		
-		// TODO: draw all transitions, add click handlers etc
-		line1.addEventHandler(KeyEvent.KEY_PRESSED, new EventHandler<KeyEvent>() {
-			@Override
-			public void handle(KeyEvent event) {
-				if (event.getCode() == KeyCode.DELETE) {
-					Confirm.confirm(ConfirmType.QUESTION, "Delete transition?", "Are you sure you want to delete the transition '" + transition.getName() + "'", new EventHandler<ActionEvent>() {
-						@Override
-						public void handle(ActionEvent arg0) {
-							removeTransition(workflow, state, transition);
-						}
-					});
-				}
-			}
-		});
-		
 		Line line2 = new Line();
 		
-		line1.addEventHandler(MouseEvent.MOUSE_CLICKED, new EventHandler<MouseEvent>() {
+		EventHandler<MouseEvent> mouseEventHandler = new EventHandler<MouseEvent>() {
 			@Override
 			public void handle(MouseEvent event) {
 				SplitPane split = new SplitPane();
@@ -766,7 +751,27 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 				line1.requestFocus();
 				event.consume();
 			}
-		});
+		};
+		
+		line1.addEventHandler(MouseEvent.MOUSE_CLICKED, mouseEventHandler);
+		line2.addEventHandler(MouseEvent.MOUSE_CLICKED, mouseEventHandler);
+		
+		EventHandler<KeyEvent> keyEventHandler = new EventHandler<KeyEvent>() {
+			@Override
+			public void handle(KeyEvent event) {
+				if (event.getCode() == KeyCode.DELETE) {
+					Confirm.confirm(ConfirmType.QUESTION, "Delete transition?", "Are you sure you want to delete the transition '" + transition.getName() + "'", new EventHandler<ActionEvent>() {
+						@Override
+						public void handle(ActionEvent arg0) {
+							removeTransition(workflow, state, transition);
+						}
+					});
+				}
+			}
+		};
+		line1.addEventHandler(KeyEvent.KEY_PRESSED, keyEventHandler);
+		line2.addEventHandler(KeyEvent.KEY_PRESSED, keyEventHandler);
+		
 		line1.getStyleClass().add("connectionLine");
 		
 		if (transition.getQuery() != null) {

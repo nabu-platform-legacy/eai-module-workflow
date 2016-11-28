@@ -34,7 +34,7 @@
 }
 
 .workflow-name {
-	-fx-padding: 6px;
+	-fx-padding: 12px 6px 6px 6px;
 	-fx-text-alignment: center;
 }
 
