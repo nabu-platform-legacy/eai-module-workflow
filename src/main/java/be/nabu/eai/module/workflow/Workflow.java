@@ -4,6 +4,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
@@ -111,7 +112,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> {
 		if (getConfig().getProvider() != null && getConfig().getProvider().getConfig().getGetWorkflows() != null) {
 			WorkflowManager workflowManager = getConfig().getProvider().getWorkflowManager();
 			String connectionId = getConfig().getConnection() == null ? null : getConfig().getConnection().getId();
-			List<WorkflowInstance> runningWorkflows = workflowManager.getWorkflows(connectionId, getId(), null, Level.RUNNING, null, null, null, null, null);
+			List<WorkflowInstance> runningWorkflows = workflowManager.getWorkflows(connectionId, getId(), null, Level.RUNNING, null, null, null, null, null, null, null, null, null, null, null, null);
 			if (runningWorkflows != null) {
 				for (WorkflowInstance workflow : runningWorkflows) {
 					try {
@@ -301,7 +302,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> {
 		if (transitionService.getServiceInterface().getInputDefinition().get("batchId") != null) {
 			batch = new WorkflowBatchInstance();
 			batch.setStarted(new Date());
-			batch.setId(UUID.randomUUID().toString());
+			batch.setId(UUID.randomUUID().toString().replace("-", ""));
 			batch.setState(Level.RUNNING);
 			batch.setSystemId(getRepository().getName());
 			batch.setTransitionId(newInstance.getId());
@@ -370,7 +371,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> {
 						}
 						if (!found) {
 							WorkflowInstanceProperty property = new WorkflowInstanceProperty();
-							property.setId(UUID.randomUUID().toString());
+							property.setId(UUID.randomUUID().toString().replace("-", ""));
 							property.setWorkflowId(workflow.getId());
 							property.setTransitionId(newInstance.getId());
 							property.setKey(element.getName());
@@ -638,6 +639,21 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> {
 		return null;
 	}
 
+	public Collection<WorkflowState> getInitialStates() {
+		Map<String, WorkflowState> initialStates = new HashMap<String, WorkflowState>();
+		List<String> targetedStates = new ArrayList<String>();
+		for (WorkflowState state : getConfig().getStates()) {
+			initialStates.put(state.getId(), state);
+			for (WorkflowTransition transition : state.getTransitions()) {
+				targetedStates.add(transition.getTargetStateId());
+			}
+		}
+		for (String targetedState : targetedStates) {
+			initialStates.remove(targetedState);
+		}
+		return initialStates.values();
+	}
+	
 	public Map<String, VMService> getMappings() {
 		return mappings;
 	}

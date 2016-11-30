@@ -6,6 +6,9 @@ import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import nabu.misc.workflow.types.WorkflowInstance;
 import nabu.misc.workflow.types.WorkflowInstanceProperty;
 import nabu.misc.workflow.types.WorkflowTransitionInstance;
@@ -22,6 +25,8 @@ import be.nabu.libs.types.api.ComplexContent;
 public class WorkflowTransitionServiceInstance implements ServiceInstance {
 	
 	private WorkflowTransitionService service;
+	
+	private Logger logger = LoggerFactory.getLogger(getClass());
 
 	public WorkflowTransitionServiceInstance(WorkflowTransitionService service) {
 		this.service = service;
@@ -41,7 +46,7 @@ public class WorkflowTransitionServiceInstance implements ServiceInstance {
 		String connectionId = service.getWorkflow().getConfig().getConnection() == null ? null : service.getWorkflow().getConfig().getConnection().getId();
 		if (service.isInitial()) {
 			instance = new WorkflowInstance();
-			instance.setId(UUID.randomUUID().toString());
+			instance.setId(UUID.randomUUID().toString().replace("-", ""));
 			if (input != null) {
 				instance.setParentId((String) input.get("parentId"));
 				instance.setCorrelationId((String) input.get("correlationId"));
@@ -88,7 +93,26 @@ public class WorkflowTransitionServiceInstance implements ServiceInstance {
 			}
 		}
 		
-		service.getWorkflow().run(instance, history, properties, service.getTransition(), executionContext.getSecurityContext().getToken(), input);
+		Boolean asynchronous = (Boolean) input.get("asynchronous");
+		
+		// TODO: in the future we can have a generic concept of a "thread pool" which you can share between for example workflows to make sure they don't use too many resources
+		// can scale this to http servers etc as well
+		if (asynchronous != null && asynchronous) {
+			new Thread(new Runnable() {
+				@Override
+				public void run() {
+					try {
+						service.getWorkflow().run(instance, history, properties, service.getTransition(), executionContext.getSecurityContext().getToken(), input);
+					}
+					catch (ServiceException e) {
+						logger.error("Workflow stopped with exception", e);
+					}
+				}
+			}).start();
+		}
+		else {
+			service.getWorkflow().run(instance, history, properties, service.getTransition(), executionContext.getSecurityContext().getToken(), input);
+		}
 		
 		ComplexContent output = service.getServiceInterface().getOutputDefinition().newInstance();
 		if (service.isInitial()) {
