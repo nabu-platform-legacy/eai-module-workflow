@@ -122,7 +122,7 @@ public class Services {
 			throw new IllegalArgumentException("No transition found that matches: " + transitionId);
 		}
 		
-		WorkflowTransitionService service = new WorkflowTransitionService(resolve, state, transition, true);
+		WorkflowTransitionService service = new WorkflowTransitionService(resolve, state, transition, false);
 		ServiceRuntime runtime = new ServiceRuntime(service, executionContext);
 		
 		ComplexContent input = service.getServiceInterface().getInputDefinition().newInstance();
