@@ -38,6 +38,7 @@ import be.nabu.libs.evaluator.types.operations.TypesOperationProvider;
 import be.nabu.libs.property.api.Value;
 import be.nabu.libs.resources.api.ResourceContainer;
 import be.nabu.libs.services.ServiceRuntime;
+import be.nabu.libs.services.ServiceUtils;
 import be.nabu.libs.services.api.ServiceException;
 import be.nabu.libs.services.pojo.POJOUtils;
 import be.nabu.libs.services.vm.api.VMService;
@@ -349,6 +350,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> {
 		ComplexContent output;
 		try {
 			ServiceRuntime serviceRuntime = new ServiceRuntime(transitionService, getRepository().newExecutionContext(token));
+			ServiceUtils.setServiceContext(serviceRuntime, workflow.getDefinitionId());
 			output = serviceRuntime.run(mapInput);
 			
 			List<WorkflowInstanceProperty> propertiesToUpdate = new ArrayList<WorkflowInstanceProperty>();
