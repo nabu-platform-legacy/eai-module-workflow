@@ -4,6 +4,7 @@ import java.net.URI;
 import java.util.Date;
 
 import javax.validation.constraints.NotNull;
+import javax.validation.constraints.Size;
 import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.XmlType;
 
@@ -96,6 +97,7 @@ public class WorkflowTransitionInstance implements Comparable<WorkflowTransition
 		this.stopped = stopped;
 	}
 	
+	@Size(max = 1000000)
 	public String getLog() {
 		return log;
 	}
@@ -103,6 +105,7 @@ public class WorkflowTransitionInstance implements Comparable<WorkflowTransition
 		this.log = log;
 	}
 	
+	@Size(max = 1000000)
 	public String getErrorLog() {
 		return errorLog;
 	}

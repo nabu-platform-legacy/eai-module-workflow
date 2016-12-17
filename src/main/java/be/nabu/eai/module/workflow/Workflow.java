@@ -73,7 +73,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> {
 	private Map<String, ComplexType> stateEvaluationStructures = new HashMap<String, ComplexType>();
 	
 	private Map<String, DefinedStructure> structures = new HashMap<String, DefinedStructure>();
-
+	
 	public Workflow(String id, ResourceContainer<?> directory, Repository repository) {
 		super(id, directory, repository, "workflow.xml", WorkflowConfiguration.class);
 		DefinedStructure properties = new DefinedStructure();

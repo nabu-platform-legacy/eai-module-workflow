@@ -105,6 +105,7 @@ public class WorkflowTransitionServiceInstance implements ServiceInstance {
 						service.getWorkflow().run(instance, history, properties, service.getTransition(), executionContext.getSecurityContext().getToken(), input);
 					}
 					catch (ServiceException e) {
+						LoggerFactory.getLogger(service.getWorkflow().getId()).error("Transition '" + service.getId() + "' exited with exception", e);
 						logger.error("Workflow stopped with exception", e);
 					}
 				}
