@@ -71,7 +71,7 @@ public class WorkflowTransitionServiceInstance implements ServiceInstance {
 			});
 		}
 		else {
-			String workflowId = (String) input.get("workflowId");
+			String workflowId = input == null ? null : (String) input.get("workflowId");
 			if (workflowId == null) {
 				throw new ServiceException("WORKFLOW-1", "No workflow id given");
 			}
@@ -93,7 +93,7 @@ public class WorkflowTransitionServiceInstance implements ServiceInstance {
 			}
 		}
 		
-		Boolean asynchronous = (Boolean) input.get("asynchronous");
+		Boolean asynchronous = input == null ? null : (Boolean) input.get("asynchronous");
 		
 		// TODO: in the future we can have a generic concept of a "thread pool" which you can share between for example workflows to make sure they don't use too many resources
 		// can scale this to http servers etc as well
