@@ -156,7 +156,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> {
 					}
 					catch (Exception e) {
 						logger.error("Could not revert workflow " + workflow.getId(), e);
-						fire(0, workflow.getId(), "Could not revert running workflow", Notification.format(e), Severity.WARNING);
+						fire("revert", 0, workflow.getId(), "Could not revert running workflow", Notification.format(e), Severity.WARNING);
 					}
 				}
 			}
@@ -179,7 +179,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> {
 							}
 							catch (Exception e) {
 								logger.error("Could not revert workflow batch " + batch.getId(), e);
-								fire(1, batch.getId(), "Could not revert running workflow batch", Notification.format(e), Severity.WARNING);
+								fire("batchRevert", 1, batch.getId(), "Could not revert running workflow batch", Notification.format(e), Severity.WARNING);
 							}
 						}
 					}
@@ -188,11 +188,12 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> {
 		}
 	}
 	
-	private void fire(int code, String id, String message, String description, Severity severity) {
+	private void fire(String type, int code, String id, String message, String description, Severity severity) {
 		try {
 			Notification notification = new Notification();
-			notification.setContext(Arrays.asList(id, getId(), "nabu.misc.workflow"));
+			notification.setContext(Arrays.asList(id, getId()));
 			notification.setCode(0);
+			notification.setType("nabu.misc.workflow." + type);
 			notification.setMessage(message);
 			notification.setDescription(description);
 			notification.setSeverity(severity);
@@ -553,7 +554,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> {
 			}
 		}
 		catch (Exception e) {
-			fire(2, workflow.getId(), "Failed while running transition '" + transition.getName() + "' (or automatic transitions after it)", Notification.format(e), Severity.ERROR);
+			fire("run", 2, workflow.getId(), "Failed while running transition '" + transition.getName() + "' (or automatic transitions after it)", Notification.format(e), Severity.ERROR);
 			if (e instanceof ServiceException) {
 				throw (ServiceException) e;
 			}
