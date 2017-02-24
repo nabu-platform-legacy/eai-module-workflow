@@ -116,7 +116,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> {
 		if (getConfig().getProvider() != null && getConfig().getProvider().getConfig().getGetWorkflows() != null) {
 			WorkflowManager workflowManager = getConfig().getProvider().getWorkflowManager();
 			String connectionId = getConfig().getConnection() == null ? null : getConfig().getConnection().getId();
-			List<WorkflowInstance> runningWorkflows = workflowManager.getWorkflows(connectionId, getId(), null, Level.RUNNING, null, null, null, null, null, null, null, null, null, null, null, null);
+			List<WorkflowInstance> runningWorkflows = workflowManager.getWorkflows(connectionId, getId(), null, Level.RUNNING, null, null, null, null, null, null, null, null, null, null, null, null, null);
 			if (runningWorkflows != null) {
 				for (WorkflowInstance workflow : runningWorkflows) {
 					try {

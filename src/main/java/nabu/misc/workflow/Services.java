@@ -230,8 +230,9 @@ public class Services {
 			@WebParam(name = "workflowType") String workflowType,
 			@WebParam(name = "properties") List<KeyValuePair> properties, 
 			@WebParam(name = "offset") Integer offset, 
-			@WebParam(name = "limit") Integer limit) {
-		return getAnyWorkflows(definitionId, stateId, token, Level.WAITING, from, until, environment, parentId, batchId, correlationId, contextId, groupId, workflowType, properties, offset, limit);
+			@WebParam(name = "limit") Integer limit,
+			@WebParam(name = "running") Boolean running) {
+		return getAnyWorkflows(definitionId, stateId, token, Level.WAITING, from, until, environment, parentId, batchId, correlationId, contextId, groupId, workflowType, properties, offset, limit, running);
 	}
 	
 	@WebResult(name = "workflow")
@@ -259,8 +260,9 @@ public class Services {
 			@WebParam(name = "workflowType") String workflowType,
 			@WebParam(name = "properties") List<KeyValuePair> properties, 
 			@WebParam(name = "offset") Integer offset, 
-			@WebParam(name = "limit") Integer limit) {
-		return getAnyWorkflows(definitionId, stateId, null, level, from, until, environment, parentId, batchId, correlationId, contextId, groupId, workflowType, properties, offset, limit);
+			@WebParam(name = "limit") Integer limit,
+			@WebParam(name = "running") Boolean running) {
+		return getAnyWorkflows(definitionId, stateId, null, level, from, until, environment, parentId, batchId, correlationId, contextId, groupId, workflowType, properties, offset, limit, running);
 	}
 	
 	private List<WorkflowInstance> getAnyWorkflows(
@@ -279,7 +281,8 @@ public class Services {
 			@WebParam(name = "workflowType") String workflowType,
 			@WebParam(name = "properties") List<KeyValuePair> properties,
 			@WebParam(name = "offset") Integer offset, 
-			@WebParam(name = "limit") Integer limit) {
+			@WebParam(name = "limit") Integer limit,
+			@WebParam(name = "running") Boolean running) {
 		Workflow resolve = (Workflow) ArtifactResolverFactory.getInstance().getResolver().resolve(definitionId);
 		if (resolve == null) {
 			throw new IllegalArgumentException("Could not find a workflow with id: " + definitionId);
@@ -315,7 +318,8 @@ public class Services {
 			workflowType,
 			properties,
 			offset, 
-			limit
+			limit,
+			running
 		);
 	}
 	

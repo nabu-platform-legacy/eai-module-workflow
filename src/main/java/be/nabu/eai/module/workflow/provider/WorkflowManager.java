@@ -36,7 +36,9 @@ public interface WorkflowManager {
 		@WebParam(name = "workflowType") String workflowType,
 		@WebParam(name = "properties") List<KeyValuePair> properties, 
 		@WebParam(name = "offset") Integer offset, 
-		@WebParam(name = "limit") Integer limit);
+		@WebParam(name = "limit") Integer limit,
+		// whether or not to limit yourself to "running" workflows (in non-final states)
+		@WebParam(name = "running") Boolean running);
 	
 	public void createWorkflowProperties(@WebParam(name = "connectionId") String connectionId, @WebParam(name = "transactionId") String transactionId, @WebParam(name = "properties") List<WorkflowInstanceProperty> properties);
 	public void updateWorkflowProperties(@WebParam(name = "connectionId") String connectionId, @WebParam(name = "transactionId") String transactionId, @WebParam(name = "properties") List<WorkflowInstanceProperty> properties);
