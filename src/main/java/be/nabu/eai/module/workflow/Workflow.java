@@ -577,6 +577,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> {
 		for (WorkflowTransition possibleTransition : possibleTransitions) {
 			if (canAutomaticallyTransition(possibleTransition)) {
 				String query = possibleTransition.getQuery();
+				Boolean value = null;
 				try {
 					if (!analyzedOperations.containsKey(query)) {
 						synchronized(analyzedOperations) {
@@ -585,7 +586,12 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> {
 							}
 						}
 					}
-					Boolean value = (Boolean) analyzedOperations.get(query).evaluate(content);
+					value = (Boolean) analyzedOperations.get(query).evaluate(content);
+				}
+				catch (Exception e) {
+					logger.error("There is an invalid query '" + query + "' for workflow: " + getId(), e);
+				}
+				try {
 					if (value != null && value) {
 						foundNext = true;
 						run(workflow, history, properties, possibleTransition, token, content);
@@ -593,7 +599,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> {
 					}
 				}
 				catch (Exception e) {
-					logger.error("There is an invalid query '" + query + "' for workflow: " + getId(), e);
+					logger.error("Could not automatically transition to " + possibleTransition.getName(), e);
 				}
 			}
 		}
