@@ -57,5 +57,15 @@
 			<artifactId>services-vm</artifactId>
 			<scope>provided</scope>
 		</dependency>
+		<dependency>
+			<groupId>nabu</groupId>
+			<artifactId>eai-module-web-application</artifactId>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>nabu</groupId>
+			<artifactId>eai-module-http-server</artifactId>
+			<scope>provided</scope>
+		</dependency>
 	</dependencies>
 </project>

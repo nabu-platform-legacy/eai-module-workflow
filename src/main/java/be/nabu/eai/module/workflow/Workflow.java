@@ -1,8 +1,10 @@
 package be.nabu.eai.module.workflow;
 
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.URI;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -22,12 +24,19 @@ import nabu.misc.workflow.types.WorkflowTransitionInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import be.nabu.eai.module.web.application.WebApplication;
+import be.nabu.eai.module.web.application.WebFragment;
+import be.nabu.eai.module.web.application.api.RESTFragment;
+import be.nabu.eai.module.web.application.api.RESTFragmentProvider;
 import be.nabu.eai.module.workflow.provider.WorkflowManager;
 import be.nabu.eai.module.workflow.provider.WorkflowProvider;
+import be.nabu.eai.module.workflow.transition.WorkflowTransitionService;
+import be.nabu.eai.repository.EAIRepositoryUtils;
 import be.nabu.eai.repository.Notification;
 import be.nabu.eai.repository.api.Repository;
 import be.nabu.eai.repository.artifacts.jaxb.JAXBArtifact;
 import be.nabu.eai.repository.util.SystemPrincipal;
+import be.nabu.libs.authentication.api.Permission;
 import be.nabu.libs.authentication.api.PermissionHandler;
 import be.nabu.libs.authentication.api.RoleHandler;
 import be.nabu.libs.authentication.api.Token;
@@ -36,6 +45,11 @@ import be.nabu.libs.evaluator.PathAnalyzer;
 import be.nabu.libs.evaluator.QueryParser;
 import be.nabu.libs.evaluator.types.api.TypeOperation;
 import be.nabu.libs.evaluator.types.operations.TypesOperationProvider;
+import be.nabu.libs.events.api.EventDispatcher;
+import be.nabu.libs.events.api.EventSubscription;
+import be.nabu.libs.http.api.HTTPRequest;
+import be.nabu.libs.http.api.HTTPResponse;
+import be.nabu.libs.http.server.HTTPServerUtils;
 import be.nabu.libs.property.api.Value;
 import be.nabu.libs.resources.api.ResourceContainer;
 import be.nabu.libs.services.ServiceRuntime;
@@ -47,6 +61,7 @@ import be.nabu.libs.types.TypeUtils;
 import be.nabu.libs.types.api.ComplexContent;
 import be.nabu.libs.types.api.ComplexType;
 import be.nabu.libs.types.api.Element;
+import be.nabu.libs.types.api.Type;
 import be.nabu.libs.types.base.ComplexElementImpl;
 import be.nabu.libs.types.base.TypeBaseUtils;
 import be.nabu.libs.types.properties.MinOccursProperty;
@@ -65,7 +80,7 @@ import be.nabu.libs.validator.api.ValidationMessage.Severity;
 
 // TODO: add security checks for transitions
 // TODO: can add a service runtime tracker that intercepts steps (and descriptions etc?) and builds a log file for each transition
-public class Workflow extends JAXBArtifact<WorkflowConfiguration> {
+public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements WebFragment, RESTFragmentProvider {
 
 	private Logger logger = LoggerFactory.getLogger(getClass());
 	
@@ -731,5 +746,134 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> {
 			return POJOUtils.newProxy(TokenValidator.class, getConfig().getTokenValidatorService(), getRepository(), SystemPrincipal.ROOT);
 		}
 		return null;
+	}
+
+	
+	/******************************* WEB FRAGMENT *******************************/
+	
+	private Map<String, List<EventSubscription<?, ?>>> subscriptions = new HashMap<String, List<EventSubscription<?, ?>>>();
+	
+	private String getKey(WebApplication artifact, String path) {
+		return artifact.getId() + ":" + path;
+	}
+	
+	@Override
+	public void start(WebApplication artifact, String path) throws IOException {
+		String key = getKey(artifact, path);
+		if (subscriptions.containsKey(key)) {
+			stop(artifact, path);
+		}
+		
+		String fullPath = artifact.getServerPath();
+		if (path != null && !path.isEmpty() && !path.equals("/")) {
+			if (!fullPath.endsWith("/")) {
+				fullPath += "/";
+			}
+			fullPath += path.replaceFirst("^[/]+", "");
+		}
+		if (!fullPath.endsWith("/")) {
+			fullPath += "/";
+		}
+		fullPath += getId();
+		
+		EventDispatcher dispatcher = artifact.getConfiguration().getVirtualHost().getDispatcher();
+		EventSubscription<HTTPRequest, HTTPResponse> subscription = dispatcher.subscribe(HTTPRequest.class, new WorkflowListener(artifact, this, Charset.defaultCharset()));
+		subscription.filter(HTTPServerUtils.limitToPath(fullPath));
+		
+		List<EventSubscription<?, ?>> list = subscriptions.get(key);
+		if (list == null) {
+			list = new ArrayList<EventSubscription<?, ?>>();
+			synchronized(subscriptions) {
+				subscriptions.put(key, list);
+			}
+		}
+		list.add(subscription);
+	}
+
+	@Override
+	public void stop(WebApplication artifact, String path) {
+		String key = getKey(artifact, path);
+		if (subscriptions.containsKey(key)) {
+			synchronized(subscriptions) {
+				if (subscriptions.containsKey(key)) {
+					for (EventSubscription<?, ?> subscription : subscriptions.get(key)) {
+						subscription.unsubscribe();
+					}
+					subscriptions.remove(key);
+				}
+			}
+		}
+	}
+
+	@Override
+	public List<Permission> getPermissions(WebApplication artifact, String path) {
+		return new ArrayList<Permission>();
+	}
+
+	@Override
+	public boolean isStarted(WebApplication artifact, String path) {
+		return subscriptions.containsKey(getKey(artifact, path));
+	}
+
+	@Override
+	public List<RESTFragment> getFragments() {
+		List<RESTFragment> fragments = new ArrayList<RESTFragment>();
+		if (getConfig().getStates() != null) {
+			Collection<WorkflowState> initialStates = getInitialStates();
+			for (WorkflowState state : getConfig().getStates()) {
+				boolean isInitial = initialStates.contains(state);
+				for (WorkflowTransition transition : state.getTransitions()) {
+					String cleanName = EAIRepositoryUtils.stringToField(transition.getName());
+					String serviceId = getId() + ".services." + (isInitial ? "initial" : "transition") + "." + cleanName;
+					WorkflowTransitionService service = (WorkflowTransitionService) getRepository().resolve(serviceId);
+					if (service == null) {
+						throw new IllegalStateException("Can not find the service: "  + serviceId);
+					}
+					fragments.add(new RESTFragment() {
+						@Override
+						public String getId() {
+							return service.getId();
+						}
+						@Override
+						public String getPath() {
+							return Workflow.this.getId() + "/" + cleanName;
+						}
+						@Override
+						public String getMethod() {
+							return isInitial ? "POST" : "PUT";
+						}
+						@Override
+						public List<String> getConsumes() {
+							return Arrays.asList("application/json", "application/xml");
+						}
+						@Override
+						public List<String> getProduces() {
+							return Arrays.asList("application/json", "application/xml");
+						}
+						@Override
+						public Type getInput() {
+							return service.getServiceInterface().getInputDefinition();
+						}
+						@Override
+						public Type getOutput() {
+							return service.getServiceInterface().getOutputDefinition();
+						}
+						@Override
+						public List<Element<?>> getQueryParameters() {
+							return new ArrayList<Element<?>>();
+						}
+						@Override
+						public List<Element<?>> getHeaderParameters() {
+							return new ArrayList<Element<?>>();
+						}
+						@Override
+						public List<Element<?>> getPathParameters() {
+							return new ArrayList<Element<?>>();
+						}
+					});
+				}
+			}
+		}
+		return fragments;
 	}
 }
