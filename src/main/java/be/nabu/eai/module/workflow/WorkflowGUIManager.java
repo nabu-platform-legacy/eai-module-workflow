@@ -152,23 +152,36 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 					public void handle(ActionEvent arg0) {
 						String name = updater.getValue("Name");
 						if (name != null) {
-							WorkflowState state = new WorkflowState();
-							state.setId(UUID.randomUUID().toString());
-							state.setName(name);
-							if (lastStateId != null) {
-								WorkflowState stateById = artifact.getStateById(lastStateId);
-								state.setX(stateById.getX() + 200);
-								state.setY(stateById.getY());
+							boolean nameTaken = false;
+							String fieldName = EAIRepositoryUtils.stringToField(name);
+							for (WorkflowState state : artifact.getConfig().getStates()) {
+								if (EAIRepositoryUtils.stringToField(state.getName()).equals(fieldName)) {
+									nameTaken = true;
+									break;
+								}
 							}
-							artifact.getConfig().getStates().add(state);
-							DefinedStructure value = new DefinedStructure();
-							value.setName("state");
-							value.setId(artifact.getId() + ".types.states." + EAIRepositoryUtils.stringToField(state.getName()));
-							artifact.getStructures().put(state.getId(), value);
-							lastStateId = state.getId();
-							((WorkflowManager) getArtifactManager()).refreshChildren((ModifiableEntry) artifact.getRepository().getEntry(artifact.getId()), artifact);
-							drawState(artifact, state);
-							MainController.getInstance().setChanged();
+							if (nameTaken) {
+								Confirm.confirm(ConfirmType.ERROR, "Can not create state", "A state by the name '" + name + "' already exists", null);
+							}
+							else {
+								WorkflowState state = new WorkflowState();
+								state.setId(UUID.randomUUID().toString());
+								state.setName(name);
+								if (lastStateId != null) {
+									WorkflowState stateById = artifact.getStateById(lastStateId);
+									state.setX(stateById.getX() + 200);
+									state.setY(stateById.getY());
+								}
+								artifact.getConfig().getStates().add(state);
+								DefinedStructure value = new DefinedStructure();
+								value.setName("state");
+								value.setId(artifact.getId() + ".types.states." + EAIRepositoryUtils.stringToField(state.getName()));
+								artifact.getStructures().put(state.getId(), value);
+								lastStateId = state.getId();
+								((WorkflowManager) getArtifactManager()).refreshChildren((ModifiableEntry) artifact.getRepository().getEntry(artifact.getId()), artifact);
+								drawState(artifact, state);
+								MainController.getInstance().setChanged();
+							}
 						}
 					}
 				});
@@ -388,61 +401,76 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 						new SimpleProperty<String>("Name", String.class, false)
 					}));
 					final SimplePropertyUpdater updater = new SimplePropertyUpdater(true, properties);
-					EAIDeveloperUtils.buildPopup(MainController.getInstance(), updater, "Add New State", new EventHandler<ActionEvent>() {
+					EAIDeveloperUtils.buildPopup(MainController.getInstance(), updater, "Add New Transition", new EventHandler<ActionEvent>() {
 						@Override
 						public void handle(ActionEvent arg0) {
 							String name = updater.getValue("Name");
 							if (name != null) {
-								WorkflowTransition transition = new WorkflowTransition();
-								transition.setId(UUID.randomUUID().toString());
-								transition.setTargetStateId(state.getId());
-								transition.setName(name);
-								
-								for (WorkflowState child : workflow.getConfig().getStates()) {
-									if (child.getId().equals(content)) {
-										child.getTransitions().add(transition);
-
-										DefinedStructure value = new DefinedStructure();
-										value.setId(workflow.getId() + ".types.transitions." + EAIRepositoryUtils.stringToField(transition.getName()));
-										value.setName("transition");
-										workflow.getStructures().put(transition.getId(), value);
-										((WorkflowManager) getArtifactManager()).refreshChildren((ModifiableEntry) workflow.getRepository().getEntry(workflow.getId()), workflow);
-
-										RectangleWithHooks rectangleWithHooks = states.get(state.getId());
-										transition.setX(state.getX() + rectangleWithHooks.getContent().getWidth() + ((child.getX() - (state.getX() + rectangleWithHooks.getContent().getWidth())) / 2));
-										transition.setY(state.getY() + (rectangleWithHooks.getContent().getHeight() / 2) - 5);
-
-										Structure input = new Structure();
-										input.setName("input");
-										input.add(new ComplexElementImpl("workflow", (ComplexType) BeanResolver.getInstance().resolve(WorkflowInstance.class), input));
-										input.add(new ComplexElementImpl("properties", workflow.getStructures().get("properties"), input));
-										input.add(new ComplexElementImpl("state", workflow.getStructures().get(child.getId()), input));
-										input.add(new ComplexElementImpl("transition", workflow.getStructures().get(transition.getId()), input));
-										input.add(new ComplexElementImpl("history", (ComplexType) BeanResolver.getInstance().resolve(WorkflowTransitionInstance.class), input, new ValueImpl<Integer>(MaxOccursProperty.getInstance(), 0), new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
-										
-										Structure output = new Structure();
-										output.setName("output");
-										output.add(new ComplexElementImpl("properties", workflow.getStructures().get("properties"), output));
-										output.add(new ComplexElementImpl("state", workflow.getStructures().get(state.getId()), output));
-										output.add(new SimpleElementImpl<String>("workflowType", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), output, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
-										output.add(new SimpleElementImpl<String>("contextId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), output, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
-										output.add(new SimpleElementImpl<String>("groupId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), output, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
-										output.add(new SimpleElementImpl<String>("log", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), output, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
-										output.add(new SimpleElementImpl<String>("code", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), output, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
-										output.add(new SimpleElementImpl<URI>("uri", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(URI.class), output, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
-										
-										Pipeline pipeline = new Pipeline(input, output);
-										SimpleVMServiceDefinition service = new SimpleVMServiceDefinition(pipeline);
-										service.setRoot(new Sequence());
-										be.nabu.libs.services.vm.step.Map map = new be.nabu.libs.services.vm.step.Map();
-										map.setParent(service.getRoot());
-										service.getRoot().getChildren().add(map);
-										
-										workflow.getMappings().put(transition.getId(), service);
-										drawTransition(workflow, child, transition);
+								boolean nameTaken = false;
+								String fieldName = EAIRepositoryUtils.stringToField(name);
+								states: for (WorkflowState state : workflow.getConfig().getStates()) {
+									for (WorkflowTransition transition : state.getTransitions()) {
+										if (EAIRepositoryUtils.stringToField(transition.getName()).equals(fieldName)) {
+											nameTaken = true;
+											break states;
+										}
 									}
 								}
-								MainController.getInstance().setChanged();
+								if (nameTaken) {
+									Confirm.confirm(ConfirmType.ERROR, "Can not create transition", "A transition by the name '" + name + "' already exists", null);
+								}
+								else {
+									WorkflowTransition transition = new WorkflowTransition();
+									transition.setId(UUID.randomUUID().toString());
+									transition.setTargetStateId(state.getId());
+									transition.setName(name);
+									
+									for (WorkflowState child : workflow.getConfig().getStates()) {
+										if (child.getId().equals(content)) {
+											child.getTransitions().add(transition);
+	
+											DefinedStructure value = new DefinedStructure();
+											value.setId(workflow.getId() + ".types.transitions." + EAIRepositoryUtils.stringToField(transition.getName()));
+											value.setName("transition");
+											workflow.getStructures().put(transition.getId(), value);
+											((WorkflowManager) getArtifactManager()).refreshChildren((ModifiableEntry) workflow.getRepository().getEntry(workflow.getId()), workflow);
+	
+											RectangleWithHooks rectangleWithHooks = states.get(state.getId());
+											transition.setX(state.getX() + rectangleWithHooks.getContent().getWidth() + ((child.getX() - (state.getX() + rectangleWithHooks.getContent().getWidth())) / 2));
+											transition.setY(state.getY() + (rectangleWithHooks.getContent().getHeight() / 2) - 5);
+	
+											Structure input = new Structure();
+											input.setName("input");
+											input.add(new ComplexElementImpl("workflow", (ComplexType) BeanResolver.getInstance().resolve(WorkflowInstance.class), input));
+											input.add(new ComplexElementImpl("properties", workflow.getStructures().get("properties"), input));
+											input.add(new ComplexElementImpl("state", workflow.getStructures().get(child.getId()), input));
+											input.add(new ComplexElementImpl("transition", workflow.getStructures().get(transition.getId()), input));
+											input.add(new ComplexElementImpl("history", (ComplexType) BeanResolver.getInstance().resolve(WorkflowTransitionInstance.class), input, new ValueImpl<Integer>(MaxOccursProperty.getInstance(), 0), new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
+											
+											Structure output = new Structure();
+											output.setName("output");
+											output.add(new ComplexElementImpl("properties", workflow.getStructures().get("properties"), output));
+											output.add(new ComplexElementImpl("state", workflow.getStructures().get(state.getId()), output));
+											output.add(new SimpleElementImpl<String>("workflowType", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), output, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
+											output.add(new SimpleElementImpl<String>("contextId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), output, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
+											output.add(new SimpleElementImpl<String>("groupId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), output, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
+											output.add(new SimpleElementImpl<String>("log", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), output, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
+											output.add(new SimpleElementImpl<String>("code", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), output, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
+											output.add(new SimpleElementImpl<URI>("uri", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(URI.class), output, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
+											
+											Pipeline pipeline = new Pipeline(input, output);
+											SimpleVMServiceDefinition service = new SimpleVMServiceDefinition(pipeline);
+											service.setRoot(new Sequence());
+											be.nabu.libs.services.vm.step.Map map = new be.nabu.libs.services.vm.step.Map();
+											map.setParent(service.getRoot());
+											service.getRoot().getChildren().add(map);
+											
+											workflow.getMappings().put(transition.getId(), service);
+											drawTransition(workflow, child, transition);
+										}
+									}
+									MainController.getInstance().setChanged();
+								}
 							}
 						}
 					});
@@ -711,6 +739,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 						}
 						if (property.getName().equals("query")) {
 							if (value != null && !((String) value).trim().isEmpty()) {
+								label.setText(transition.getName() + ("true".equals(value) ? "" : "\n" + value));
 								if (!line1.getStyleClass().contains("indexQueryLine")) {
 									line1.getStyleClass().add("indexQueryLine");
 								}
@@ -719,6 +748,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 								}
 							}
 							else {
+								label.setText(transition.getName());
 								if (line1.getStyleClass().contains("indexQueryLine")) {
 									line1.getStyleClass().remove("indexQueryLine");
 								}
