@@ -67,7 +67,6 @@ public class WorkflowConfiguration {
 		this.tokenValidatorService = tokenValidatorService;
 	}
 	
-	@NotNull
 	@XmlJavaTypeAdapter(value = ArtifactXMLAdapter.class)
 	public DataSourceProviderArtifact getConnection() {
 		return connection;
