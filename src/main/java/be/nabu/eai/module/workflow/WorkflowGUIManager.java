@@ -502,6 +502,13 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 						if (shape instanceof Line) {
 							shape.getStyleClass().add("connectionLine-hover");
 						}
+						else if (shape instanceof AnchorPane) {
+							for (Node child : ((AnchorPane) shape).getChildren()) {
+								if (child instanceof Label) {
+									child.setVisible(true);
+								}
+							}
+						}
 					}
 					states.get(transition.getTargetStateId()).getContent().getStyleClass().add("active-to");
 				}
@@ -515,6 +522,13 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 					for (Node shape : transitions.get(transition.getId())) {
 						if (shape instanceof Line) {
 							shape.getStyleClass().remove("connectionLine-hover");
+						}
+						else if (shape instanceof AnchorPane) {
+							for (Node child : ((AnchorPane) shape).getChildren()) {
+								if (child instanceof Label) {
+									child.setVisible(false);
+								}
+							}
 						}
 					}
 					states.get(transition.getTargetStateId()).getContent().getStyleClass().remove("active-to");
@@ -641,6 +655,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		labelPane.layoutXProperty().bind(circle.layoutXProperty().add(pane.layoutXProperty()).subtract(label.widthProperty().divide(2)));
 		labelPane.layoutYProperty().bind(circle.layoutYProperty().add(pane.layoutYProperty()).add(circle.radiusProperty().multiply(2)));
 		labelPane.getChildren().add(label);
+		label.setVisible(false);
 		shapes.add(labelPane);
 		
 		circle.addEventHandler(MouseEvent.MOUSE_CLICKED, new EventHandler<MouseEvent>() {
@@ -855,6 +870,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 				states.get(transition.getTargetStateId()).getContent().getStyleClass().add("active-to");
 				line1.getStyleClass().add("connectionLine-hover");
 				line2.getStyleClass().add("connectionLine-hover");
+				label.setVisible(true);
 			}
 		};
 		EventHandler<MouseEvent> unhighlightStates = new EventHandler<MouseEvent>() {
@@ -864,6 +880,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 				states.get(transition.getTargetStateId()).getContent().getStyleClass().remove("active-to");
 				line1.getStyleClass().remove("connectionLine-hover");
 				line2.getStyleClass().remove("connectionLine-hover");
+				label.setVisible(false);
 			}
 		};
 		line1.addEventHandler(MouseEvent.MOUSE_ENTERED, highlightStates);
