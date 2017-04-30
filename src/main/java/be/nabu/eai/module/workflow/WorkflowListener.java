@@ -115,6 +115,8 @@ public class WorkflowListener implements EventHandler<HTTPRequest, HTTPResponse>
 			}
 			
 			ServiceRuntime runtime = new ServiceRuntime(service, application.getRepository().newExecutionContext(token));
+			runtime.getContext().put("session", WebApplicationUtils.getSession(application, request));
+			runtime.getContext().put("device", device);
 			ServiceUtils.setServiceContext(runtime, workflow.getId());
 
 			ComplexContent output = runtime.run(input);
