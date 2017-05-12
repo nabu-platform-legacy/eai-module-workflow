@@ -140,43 +140,6 @@ public class Services {
 		resolve.recover();
 	}
 	
-	@WebResult(name = "states")
-	public List<String> getActionableStates(@NotNull @WebParam(name = "definitionId") String definitionId, @WebParam(name = "token") Token token) {
-		List<String> states = new ArrayList<String>();
-		Workflow resolve = (Workflow) ArtifactResolverFactory.getInstance().getResolver().resolve(definitionId);
-		if (resolve == null) {
-			throw new IllegalArgumentException("Could not find a workflow with id: " + definitionId);
-		}
-		TokenValidator tokenValidator = resolve.getTokenValidator();
-		if (tokenValidator != null && token != null && !tokenValidator.isValid(token)) {
-			token = null;
-		}
-		RoleHandler roleHandler = resolve.getRoleHandler();
-		states: for (WorkflowState state : resolve.getConfig().getStates()) {
-			if (state.getTransitions() != null) {
-				for (WorkflowTransition transition : state.getTransitions()) {
-					if (transition.getRoles() != null && !transition.getRoles().isEmpty()) {
-						if (roleHandler == null) {
-							throw new IllegalStateException("The workflow '" + definitionId + "' does have roles but no role handler");
-						}
-						for (String role : transition.getRoles()) {
-							if (roleHandler.hasRole(token, role)) {
-								states.add(state.getId());
-								continue states;
-							}
-						}
-					}
-					// anonymous access to this transition
-					else {
-						states.add(state.getId());
-						continue states;
-					}
-				}
-			}
-		}
-		return states;
-	}
-	
 	@WebResult(name = "properties")
 	public List<WorkflowInstanceProperty> getProperties(@NotNull @WebParam(name = "definitionId") String definitionId, @NotNull @WebParam(name = "workflowId") String workflowId) {
 		Workflow resolve = (Workflow) ArtifactResolverFactory.getInstance().getResolver().resolve(definitionId);
@@ -350,6 +313,73 @@ public class Services {
 		}
 		Collections.sort(definitions);
 		return definitions;
+	}
+	
+	@WebResult(name = "states")
+	public List<WorkflowState> getInitialStates(@NotNull @WebParam(name = "definitionId") String definitionId) {
+		Workflow resolve = (Workflow) ArtifactResolverFactory.getInstance().getResolver().resolve(definitionId);
+		if (resolve == null) {
+			throw new IllegalArgumentException("Could not find a workflow with id: " + definitionId);
+		}
+		return new ArrayList<WorkflowState>(resolve.getInitialStates());
+	}
+	
+	@WebResult(name = "states")
+	public List<WorkflowState> getFinalStates(@NotNull @WebParam(name = "definitionId") String definitionId) {
+		Workflow resolve = (Workflow) ArtifactResolverFactory.getInstance().getResolver().resolve(definitionId);
+		if (resolve == null) {
+			throw new IllegalArgumentException("Could not find a workflow with id: " + definitionId);
+		}
+		return new ArrayList<WorkflowState>(resolve.getFinalStates());
+	}
+	
+	@WebResult(name = "states")
+	public List<WorkflowState> getTransientStates(@NotNull @WebParam(name = "definitionId") String definitionId) {
+		Workflow resolve = (Workflow) ArtifactResolverFactory.getInstance().getResolver().resolve(definitionId);
+		if (resolve == null) {
+			throw new IllegalArgumentException("Could not find a workflow with id: " + definitionId);
+		}
+		ArrayList<WorkflowState> list = new ArrayList<WorkflowState>(resolve.getConfig().getStates());
+		list.removeAll(resolve.getFinalStates());
+		list.removeAll(resolve.getInitialStates());
+		return list;
+	}
+	
+	@WebResult(name = "states")
+	public List<WorkflowState> getActionableStates(@NotNull @WebParam(name = "definitionId") String definitionId, @WebParam(name = "token") Token token) {
+		List<WorkflowState> states = new ArrayList<WorkflowState>();
+		Workflow resolve = (Workflow) ArtifactResolverFactory.getInstance().getResolver().resolve(definitionId);
+		if (resolve == null) {
+			throw new IllegalArgumentException("Could not find a workflow with id: " + definitionId);
+		}
+		TokenValidator tokenValidator = resolve.getTokenValidator();
+		if (tokenValidator != null && token != null && !tokenValidator.isValid(token)) {
+			token = null;
+		}
+		RoleHandler roleHandler = resolve.getRoleHandler();
+		states: for (WorkflowState state : resolve.getConfig().getStates()) {
+			if (state.getTransitions() != null) {
+				for (WorkflowTransition transition : state.getTransitions()) {
+					if (transition.getRoles() != null && !transition.getRoles().isEmpty()) {
+						if (roleHandler == null) {
+							throw new IllegalStateException("The workflow '" + definitionId + "' does have roles but no role handler");
+						}
+						for (String role : transition.getRoles()) {
+							if (roleHandler.hasRole(token, role)) {
+								states.add(state);
+								continue states;
+							}
+						}
+					}
+					// anonymous access to this transition
+					else {
+						states.add(state);
+						continue states;
+					}
+				}
+			}
+		}
+		return states;
 	}
 	
 	@WebResult(name = "definitions")

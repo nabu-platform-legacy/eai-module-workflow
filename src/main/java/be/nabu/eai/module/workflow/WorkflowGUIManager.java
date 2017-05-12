@@ -165,7 +165,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 							}
 							else {
 								WorkflowState state = new WorkflowState();
-								state.setId(UUID.randomUUID().toString());
+								state.setId(UUID.randomUUID().toString().replace("-", ""));
 								state.setName(name);
 								if (lastStateId != null) {
 									WorkflowState stateById = artifact.getStateById(lastStateId);
@@ -421,7 +421,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 								}
 								else {
 									WorkflowTransition transition = new WorkflowTransition();
-									transition.setId(UUID.randomUUID().toString());
+									transition.setId(UUID.randomUUID().toString().replace("-", ""));
 									transition.setTargetStateId(state.getId());
 									transition.setName(name);
 									

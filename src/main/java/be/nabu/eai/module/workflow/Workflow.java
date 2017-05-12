@@ -720,6 +720,16 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 		}
 		return initialStates.values();
 	}
+
+	public Collection<WorkflowState> getFinalStates() {
+		Map<String, WorkflowState> finalStates = new HashMap<String, WorkflowState>();
+		for (WorkflowState state : getConfig().getStates()) {
+			if (state.getTransitions().isEmpty()) {
+				finalStates.put(state.getId(), state);
+			}
+		}
+		return finalStates.values();
+	}
 	
 	public Map<String, VMService> getMappings() {
 		return mappings;
