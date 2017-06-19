@@ -665,6 +665,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 				try {
 					VMServiceGUIManager serviceManager = new VMServiceGUIManager();
 					serviceManager.setDisablePipelineEditing(true);
+					serviceManager.setActualId(workflow.getId());
 					VMService service = workflow.getMappings().get(transition.getId());
 					VMServiceController controller = serviceManager.displayWithController(MainController.getInstance(), pane, service);
 					TreeItem<Step> root = serviceManager.getServiceTree().rootProperty().get();
