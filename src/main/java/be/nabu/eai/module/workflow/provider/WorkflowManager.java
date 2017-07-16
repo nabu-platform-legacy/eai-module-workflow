@@ -19,6 +19,7 @@ public interface WorkflowManager {
 	public void updateWorkflow(@WebParam(name = "connectionId") String connectionId, @WebParam(name = "transactionId") String transactionId, @NotNull @WebParam(name = "instance") WorkflowInstance instance);
 	@WebResult(name = "workflow")
 	public WorkflowInstance getWorkflow(@WebParam(name = "connectionId") String connectionId, @WebParam(name = "workflowId") @NotNull String workflowId);
+	
 	@WebResult(name = "workflows")
 	public List<WorkflowInstance> getWorkflows(
 		@WebParam(name = "connectionId") String connectionId, 
@@ -64,6 +65,29 @@ public interface WorkflowManager {
 	public Level calculateBatchState(@WebParam(name = "connectionId") String connectionId, @NotNull @WebParam(name = "batchId") String batchId);
 	@WebResult(name = "batch")
 	public WorkflowBatchInstance getBatch(@WebParam(name = "connectionId") String connectionId, @WebParam(name = "batchId") @NotNull String batchId);
+	
 	@WebResult(name = "batches")
 	public List<WorkflowBatchInstance> getBatches(@WebParam(name = "connectionId") String connectionId, @WebParam(name = "state") Level state, @WebParam(name = "offset") Integer offset, @WebParam(name = "limit") Integer limit);
+
+	@WebResult(name = "amount")
+	public default Long getAmountOfWorkflows(
+		@WebParam(name = "connectionId") String connectionId, 
+		@NotNull @WebParam(name = "definitionId") String definitionId, 
+		@WebParam(name = "stateId") String stateId, 
+		@WebParam(name = "transitionState") Level state, 
+		@WebParam(name = "from") Date from, 
+		@WebParam(name = "until") Date until, 
+		@WebParam(name = "environment") String environment, 
+		@WebParam(name = "parentId") String parentId, 
+		@WebParam(name = "batchId") String batchId, 
+		@WebParam(name = "correlationId") String correlationId,
+		@WebParam(name = "contextId") String contextId,
+		@WebParam(name = "groupId") String groupId,
+		@WebParam(name = "workflowType") String workflowType,
+		@WebParam(name = "properties") List<KeyValuePair> properties, 
+		// whether or not to limit yourself to "running" workflows (in non-final states)
+		@WebParam(name = "running") Boolean running) {
+		
+		return (long) getWorkflows(connectionId, definitionId, stateId, state, from, until, environment, parentId, batchId, correlationId, contextId, groupId, workflowType, properties, null, null, running).size();
+	}
 }

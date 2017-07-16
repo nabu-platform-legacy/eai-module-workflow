@@ -286,6 +286,57 @@ public class Services {
 		);
 	}
 	
+	@WebResult(name = "amount")
+	public Long getAmountOfWorkflows(
+			@NotNull @WebParam(name = "definitionId") String definitionId, 
+			@WebParam(name = "stateId") String stateId, 
+			@WebParam(name = "transactionState") Level level, 
+			@WebParam(name = "from") Date from, 
+			@WebParam(name = "until") Date until,
+			@WebParam(name = "environment") String environment, 
+			@WebParam(name = "parentId") String parentId, 
+			@WebParam(name = "batchId") String batchId, 
+			@WebParam(name = "correlationId") String correlationId,
+			@WebParam(name = "contextId") String contextId,
+			@WebParam(name = "groupId") String groupId,
+			@WebParam(name = "workflowType") String workflowType,
+			@WebParam(name = "properties") List<KeyValuePair> properties, 
+			@WebParam(name = "running") Boolean running) {
+		Workflow resolve = (Workflow) ArtifactResolverFactory.getInstance().getResolver().resolve(definitionId);
+		if (resolve == null) {
+			throw new IllegalArgumentException("Could not find a workflow with id: " + definitionId);
+		}
+		WorkflowState workflowState = null;
+		if (stateId != null) {
+			for (WorkflowState potential : resolve.getConfig().getStates()) {
+				if (potential.getName().equals(stateId) || potential.getId().equals(stateId)) {
+					workflowState = potential;
+					break;
+				}
+			}
+			if (workflowState == null) {
+				throw new IllegalArgumentException("'" + stateId + "' is not a valid state for the workflow '" + definitionId + "'");
+			}
+		}
+		return resolve.getConfig().getProvider().getWorkflowManager().getAmountOfWorkflows(
+				resolve.getConfig().getConnection() == null ? null : resolve.getConfig().getConnection().getId(), 
+				definitionId, 
+				workflowState == null ? null : workflowState.getId(), 
+				level, 
+				from,
+				until,
+				environment, 
+				parentId, 
+				batchId, 
+				correlationId, 
+				contextId, 
+				groupId, 
+				workflowType,
+				properties,
+				running
+			);
+	}
+	
 	@WebResult(name = "propertyDefinitions")
 	protected List<KeyValuePair> getPropertyDefinitions(@NotNull @WebParam(name = "definitionId") String definitionId) {
 		Workflow resolve = (Workflow) ArtifactResolverFactory.getInstance().getResolver().resolve(definitionId);
