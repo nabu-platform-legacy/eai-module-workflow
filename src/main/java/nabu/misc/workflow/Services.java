@@ -5,7 +5,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 import javax.jws.WebParam;
 import javax.jws.WebResult;
@@ -150,6 +154,70 @@ public class Services {
 			resolve.getConfig().getConnection() == null ? null : resolve.getConfig().getConnection().getId(), 
 			workflowId
 		);
+	}
+
+	@WebResult(name = "properties")
+	public List<WorkflowInstanceProperty> setProperties(@NotNull @WebParam(name = "definitionId") String definitionId, @NotNull @WebParam(name = "workflowId") String workflowId, @WebParam(name = "properties") List<KeyValuePair> properties) {
+		if (properties == null || properties.isEmpty()) {
+			return null;
+		}
+		Workflow resolve = (Workflow) ArtifactResolverFactory.getInstance().getResolver().resolve(definitionId);
+		if (resolve == null) {
+			throw new IllegalArgumentException("Could not find a workflow with id: " + definitionId);
+		}
+		List<WorkflowTransitionInstance> history = getHistory(definitionId, workflowId);
+		WorkflowTransitionInstance transition = history.get(history.size() - 1);
+		// we bind the properties to the last transition that has occurred
+		// this makes it slightly harder in retrospect to examine manually updated properties
+		// but it does allow the properties to exist within the temporal hierarchy where we can determine whether the property overwrites an existing value from an earlier transition or is overwritten in turn in a later transition
+		List<WorkflowInstanceProperty> existingProperties = getProperties(definitionId, workflowId);
+		Iterator<WorkflowInstanceProperty> iterator = existingProperties.iterator();
+		Map<String, WorkflowInstanceProperty> hash = new HashMap<String, WorkflowInstanceProperty>();
+		while (iterator.hasNext()) {
+			WorkflowInstanceProperty next = iterator.next();
+			if (!next.getTransitionId().equals(transition.getId())) {
+				iterator.remove();
+			}
+			else {
+				hash.put(next.getKey(), next);
+			}
+		}
+		List<WorkflowInstanceProperty> newProperties = new ArrayList<WorkflowInstanceProperty>();
+		List<WorkflowInstanceProperty> updatedProperties = new ArrayList<WorkflowInstanceProperty>();
+		for (KeyValuePair property : properties) {
+			if (hash.containsKey(property.getKey())) {
+				WorkflowInstanceProperty workflowInstanceProperty = hash.get(property.getKey());
+				workflowInstanceProperty.setValue(property.getValue());
+				updatedProperties.add(workflowInstanceProperty);
+			}
+			else {
+				WorkflowInstanceProperty workflowInstanceProperty = new WorkflowInstanceProperty();
+				workflowInstanceProperty.setId(UUID.randomUUID().toString().replace("-", ""));
+				workflowInstanceProperty.setKey(property.getKey());
+				workflowInstanceProperty.setValue(property.getValue());
+				workflowInstanceProperty.setTransitionId(transition.getId());
+				workflowInstanceProperty.setWorkflowId(workflowId);
+				newProperties.add(workflowInstanceProperty);
+			}
+		}
+		if (!updatedProperties.isEmpty()) {
+			resolve.getConfig().getProvider().getWorkflowManager().updateWorkflowProperties(
+				resolve.getConfig().getConnection() == null ? null : resolve.getConfig().getConnection().getId(), 
+				null, 
+				updatedProperties
+			);
+		}
+		if (!newProperties.isEmpty()) {
+			resolve.getConfig().getProvider().getWorkflowManager().createWorkflowProperties(
+				resolve.getConfig().getConnection() == null ? null : resolve.getConfig().getConnection().getId(), 
+				null, 
+				newProperties
+			);
+		}
+		List<WorkflowInstanceProperty> allProperties = new ArrayList<WorkflowInstanceProperty>();
+		allProperties.addAll(newProperties);
+		allProperties.addAll(updatedProperties);
+		return allProperties;
 	}
 	
 	@WebResult(name = "transitions")

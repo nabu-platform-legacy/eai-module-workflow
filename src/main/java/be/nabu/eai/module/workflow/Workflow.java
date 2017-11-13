@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -279,6 +280,15 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 		return stateEvaluationStructures.get(stateId);
 	}
 	
+	private WorkflowTransitionInstance getTransitionInstance(List<WorkflowTransitionInstance> history, String id) {
+		for (WorkflowTransitionInstance instance : history) {
+			if (instance.getId().equals(id)) {
+				return instance;
+			}
+		}
+		return null;
+	}
+	
 	public void run(WorkflowInstance workflow, List<WorkflowTransitionInstance> history, List<WorkflowInstanceProperty> properties, WorkflowTransition transition, Token token, ComplexContent input) throws ServiceException {
 		try {
 			// check if the current user is allowed to run it
@@ -316,6 +326,17 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 			String connectionId = getConfig().getConnection() == null ? null : getConfig().getConnection().getId();
 			
 			Collections.sort(history);
+			
+			// we sort the properties based on their transition history
+			// this allows us to set the value in the correct order to preserve overwrites
+			properties.sort(new Comparator<WorkflowInstanceProperty>() {
+				@Override
+				public int compare(WorkflowInstanceProperty o1, WorkflowInstanceProperty o2) {
+					WorkflowTransitionInstance transitionInstance1 = getTransitionInstance(history, o1.getTransitionId());
+					WorkflowTransitionInstance transitionInstance2 = getTransitionInstance(history, o2.getTransitionId());
+					return transitionInstance1.getSequence() - transitionInstance2.getSequence();
+				}
+			});
 			
 			// we create the transition entry
 			WorkflowTransitionInstance newInstance = new WorkflowTransitionInstance();
@@ -408,15 +429,20 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 						String value = stringMap.get(key);
 						if (value != null) {
 							boolean found = false;
-							for (WorkflowInstanceProperty current : properties) {
-								if (current.getKey().equals(key)) {
-									current.setValue(value);
-									current.setTransitionId(newInstance.getId());
-									propertiesToUpdate.add(current);
-									found = true;
-									break;
-								}
-							}
+							
+							// we no longer update properties based on key
+							// instead we set the key/value for this given transition instance
+							// that gives us a history of the property values over time in the workflow
+//							for (WorkflowInstanceProperty current : properties) {
+//								if (current.getKey().equals(key)) {
+//									current.setValue(value);
+//									current.setTransitionId(newInstance.getId());
+//									propertiesToUpdate.add(current);
+//									found = true;
+//									break;
+//								}
+//							}
+							
 							if (!found) {
 								WorkflowInstanceProperty property = new WorkflowInstanceProperty();
 								property.setId(UUID.randomUUID().toString().replace("-", ""));
@@ -610,11 +636,17 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 					if (value != null && value) {
 						foundNext = true;
 						run(workflow, history, properties, possibleTransition, token, content);
-						break;
 					}
 				}
 				catch (Exception e) {
 					logger.error("Could not automatically transition to " + possibleTransition.getName(), e);
+				}
+				finally {
+					// stop running, also in case of error
+					// otherwise other matching transitions might occur
+					if (foundNext) {
+						break;
+					}
 				}
 			}
 		}
