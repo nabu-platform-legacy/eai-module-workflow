@@ -56,8 +56,7 @@ public class Services {
 			@WebParam(name = "contextId") String contextId, 
 			@WebParam(name = "groupId") String groupId, 
 			@WebParam(name = "workflowType") String workflowType, 
-			@WebParam(name = "uri") URI uri, 
-			@WebParam(name = "asynchronous") Boolean asynchronous) throws ServiceException {
+			@WebParam(name = "uri") URI uri) throws ServiceException {
 		Workflow resolve = (Workflow) ArtifactResolverFactory.getInstance().getResolver().resolve(definitionId);
 		if (resolve == null) {
 			throw new IllegalArgumentException("Could not find a workflow with id: " + definitionId);
@@ -97,7 +96,7 @@ public class Services {
 		input.set("groupId", groupId);
 		input.set("workflowType", workflowType);
 		input.set("uri", uri);
-		input.set("asynchronous", asynchronous);
+//		input.set("asynchronous", asynchronous);
 		ComplexContent run = runtime.run(input);
 		return run == null ? null : (String) run.get("workflowId");
 	}
@@ -145,15 +144,24 @@ public class Services {
 	}
 	
 	@WebResult(name = "properties")
-	public List<WorkflowInstanceProperty> getProperties(@NotNull @WebParam(name = "definitionId") String definitionId, @NotNull @WebParam(name = "workflowId") String workflowId) {
+	public List<WorkflowInstanceProperty> getProperties(@NotNull @WebParam(name = "definitionId") String definitionId, @NotNull @WebParam(name = "workflowId") String workflowId, @WebParam(name = "retainHistory") Boolean retainHistory) {
 		Workflow resolve = (Workflow) ArtifactResolverFactory.getInstance().getResolver().resolve(definitionId);
 		if (resolve == null) {
 			throw new IllegalArgumentException("Could not find a workflow with id: " + definitionId);
 		}
-		return resolve.getConfig().getProvider().getWorkflowManager().getWorkflowProperties(
+		List<WorkflowInstanceProperty> workflowProperties = resolve.getConfig().getProvider().getWorkflowManager().getWorkflowProperties(
 			resolve.getConfig().getConnection() == null ? null : resolve.getConfig().getConnection().getId(), 
 			workflowId
 		);
+		// unless we want to retain the history, we want only version for each unique key (the last version)
+		if (workflowProperties != null && (retainHistory == null || !retainHistory)) {
+			Map<String, WorkflowInstanceProperty> properties = new HashMap<String, WorkflowInstanceProperty>();
+			for (WorkflowInstanceProperty property : workflowProperties) {
+				properties.put(property.getKey(), property);
+			}
+			workflowProperties = new ArrayList<WorkflowInstanceProperty>(properties.values());
+		}
+		return workflowProperties;
 	}
 
 	@WebResult(name = "properties")
@@ -170,7 +178,7 @@ public class Services {
 		// we bind the properties to the last transition that has occurred
 		// this makes it slightly harder in retrospect to examine manually updated properties
 		// but it does allow the properties to exist within the temporal hierarchy where we can determine whether the property overwrites an existing value from an earlier transition or is overwritten in turn in a later transition
-		List<WorkflowInstanceProperty> existingProperties = getProperties(definitionId, workflowId);
+		List<WorkflowInstanceProperty> existingProperties = getProperties(definitionId, workflowId, false);
 		Iterator<WorkflowInstanceProperty> iterator = existingProperties.iterator();
 		Map<String, WorkflowInstanceProperty> hash = new HashMap<String, WorkflowInstanceProperty>();
 		while (iterator.hasNext()) {

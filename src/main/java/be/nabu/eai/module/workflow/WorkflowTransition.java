@@ -2,6 +2,8 @@ package be.nabu.eai.module.workflow;
 
 import java.util.List;
 
+import javax.xml.bind.annotation.XmlTransient;
+
 // can not directly refer to target state as this may result in circular references!!
 // must refer to the id of the target state, separate resolving
 public class WorkflowTransition implements Comparable<WorkflowTransition> {
@@ -21,6 +23,8 @@ public class WorkflowTransition implements Comparable<WorkflowTransition> {
 	private boolean startBatch;
 	// the connecting circle
 	private double x, y;
+	// the operation id for this transition
+	private String operationId;
 	
 	public String getId() {
 		return id;
@@ -90,4 +94,14 @@ public class WorkflowTransition implements Comparable<WorkflowTransition> {
 	public void setStartBatch(boolean startBatch) {
 		this.startBatch = startBatch;
 	}
+
+	// should not be persisted but...in a hurry! @hackathon gsk 2018-01-18
+	public String getOperationId() {
+		return operationId;
+	}
+	public void setOperationId(String operationId) {
+		this.operationId = operationId;
+	}
+	
+	
 }

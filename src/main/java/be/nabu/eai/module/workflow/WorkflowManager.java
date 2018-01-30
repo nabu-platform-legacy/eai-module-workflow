@@ -224,7 +224,10 @@ public class WorkflowManager extends JAXBArtifactManager<WorkflowConfiguration, 
 		Map<String, WorkflowState> initialStates = new HashMap<String, WorkflowState>();
 		List<String> targetedStates = new ArrayList<String>();
 		for (WorkflowState state : artifact.getConfig().getStates()) {
-			initialStates.put(state.getId(), state);
+			// extension states are not initial states
+			if (!artifact.isExtensionState(state.getId()) && !artifact.isExtensionState(state.getName())) {
+				initialStates.put(state.getId(), state);
+			}
 			for (WorkflowTransition transition : state.getTransitions()) {
 				targetedStates.add(transition.getTargetStateId());
 			}
@@ -246,6 +249,7 @@ public class WorkflowManager extends JAXBArtifactManager<WorkflowConfiguration, 
 				node.setEntry(childEntry);
 				initial.addChildren(childEntry);
 				entries.add(childEntry);
+				transition.setOperationId(childEntry.getId());
 			}
 		}
 		
@@ -262,7 +266,8 @@ public class WorkflowManager extends JAXBArtifactManager<WorkflowConfiguration, 
 					Entry childEntry = new MemoryEntry(parent.getRepository(), transitions, node, service.getId(), service.getName());
 					node.setEntry(childEntry);
 					transitions.addChildren(childEntry);
-					entries.add(childEntry);		
+					entries.add(childEntry);	
+					transition.setOperationId(childEntry.getId());
 				}
 			}
 		}

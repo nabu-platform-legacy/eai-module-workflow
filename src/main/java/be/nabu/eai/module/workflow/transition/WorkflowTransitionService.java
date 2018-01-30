@@ -85,7 +85,7 @@ public class WorkflowTransitionService implements DefinedService {
 						}
 						input.add(new ComplexElementImpl("state", (ComplexType) workflow.getRepository().resolve(workflow.getId() + ".types.states." + EAIRepositoryUtils.stringToField(fromState.getName())), input));
 						input.add(new ComplexElementImpl("transition", (ComplexType) workflow.getRepository().resolve(workflow.getId() + ".types.transitions." + EAIRepositoryUtils.stringToField(transition.getName())), input));
-						input.add(new SimpleElementImpl<Boolean>("asynchronous", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(Boolean.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "Whether or not the execution should be done asynchronously")));
+//						input.add(new SimpleElementImpl<Boolean>("asynchronous", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(Boolean.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "Whether or not the execution should be done asynchronously")));
 						WorkflowTransitionService.this.input = input;
 					}
 				}

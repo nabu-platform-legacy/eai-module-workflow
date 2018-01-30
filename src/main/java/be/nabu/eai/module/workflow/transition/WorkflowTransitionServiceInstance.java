@@ -15,6 +15,7 @@ import nabu.misc.workflow.types.WorkflowTransitionInstance;
 import nabu.misc.workflow.types.WorkflowInstance.Level;
 import be.nabu.eai.module.workflow.Workflow;
 import be.nabu.eai.module.workflow.Workflow.TransactionableAction;
+import be.nabu.eai.module.workflow.WorkflowState;
 import be.nabu.eai.module.workflow.provider.WorkflowManager;
 import be.nabu.libs.services.api.ExecutionContext;
 import be.nabu.libs.services.api.Service;
@@ -80,7 +81,21 @@ public class WorkflowTransitionServiceInstance implements ServiceInstance {
 			instance = workflowManager.getWorkflow(connectionId, workflowId);
 			
 			if (!instance.getStateId().equals(service.getFromState().getId())) {
-				throw new ServiceException("WORKFLOW-0", "Workflow " + workflowId + " is not in the correct state to trigger this transition");
+				boolean isExtension = false;
+				// check if the "from state" is actually an extension
+				WorkflowState state = service.getWorkflow().getStateById(instance.getStateId());
+				if (state.getExtensions() != null) {
+					for (String extension : state.getExtensions()) {
+						WorkflowState extensionState = service.getWorkflow().getStateById(extension);
+						if (service.getFromState().getId().equals(extensionState.getId())) {
+							isExtension = true;
+							break;
+						}
+					}
+				}
+				if (!isExtension) {
+					throw new ServiceException("WORKFLOW-0", "Workflow " + workflowId + " is not in the correct state to trigger this transition");
+				}
 			}
 			
 			List<WorkflowTransitionInstance> transitions = workflowManager.getTransitions(connectionId, workflowId);
@@ -93,6 +108,7 @@ public class WorkflowTransitionServiceInstance implements ServiceInstance {
 			}
 		}
 		
+		// TODO: deprecated!
 		Boolean asynchronous = input == null ? null : (Boolean) input.get("asynchronous");
 		
 		// TODO: in the future we can have a generic concept of a "thread pool" which you can share between for example workflows to make sure they don't use too many resources

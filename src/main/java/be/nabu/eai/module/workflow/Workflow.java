@@ -710,7 +710,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 
 	public WorkflowState getStateById(String id) {
 		for (WorkflowState state : getConfig().getStates()) {
-			if (state.getId().equals(id)) {
+			if (state.getId().equals(id) || state.getName().equals(id)) {
 				return state;
 			}
 		}
@@ -738,6 +738,17 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 		return null;
 	}
 
+	public boolean isExtensionState(String id) {
+		if (getConfig().getStates() != null) {
+			for (WorkflowState state : getConfig().getStates()) {
+				if (state.getExtensions() != null && state.getExtensions().contains(id)) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+	
 	public Collection<WorkflowState> getInitialStates() {
 		Map<String, WorkflowState> initialStates = new HashMap<String, WorkflowState>();
 		List<String> targetedStates = new ArrayList<String>();

@@ -49,6 +49,7 @@ import be.nabu.eai.developer.MainController;
 import be.nabu.eai.developer.controllers.VMServiceController;
 import be.nabu.eai.developer.managers.base.BaseArtifactGUIInstance;
 import be.nabu.eai.developer.managers.base.BaseJAXBGUIManager;
+import be.nabu.eai.developer.managers.util.EnumeratedSimpleProperty;
 import be.nabu.eai.developer.managers.util.MovablePane;
 import be.nabu.eai.developer.managers.util.SimpleProperty;
 import be.nabu.eai.developer.managers.util.SimplePropertyUpdater;
@@ -302,6 +303,16 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 				leftScrollPane.setFitToWidth(true);
 				leftScrollPane.setContent(left);
 				
+				EnumeratedSimpleProperty<String> extensionProperty = new EnumeratedSimpleProperty<String>("extensions", String.class, false);
+				if (workflow.getConfig().getStates() != null) {
+					for (WorkflowState initialState : workflow.getInitialStates()) {
+						if (state.getExtensions() == null || !state.getExtensions().contains(initialState.getId())) {
+							extensionProperty.addAll(initialState.getName());
+						}
+					}
+				}
+				
+				// TODO: extensions should really be enumerated and should persist ids instead of names...
 				SimplePropertyUpdater createUpdater = EAIDeveloperUtils.createUpdater(state, null, "x", "y", "transitions.*", "id", "name");
 				MainController.getInstance().showProperties(createUpdater, right, true);
 			
@@ -385,7 +396,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 			@Override
 			public void handle(DragEvent event) {
 				Object content = event.getDragboard().getContent(TreeDragDrop.getDataFormat("connect"));
-				if (content != null) {
+				if (content != null && !workflow.isExtensionState(state.getId()) && !workflow.isExtensionState(state.getName())) {
 					event.acceptTransferModes(TransferMode.ANY);
 					event.consume();
 				}

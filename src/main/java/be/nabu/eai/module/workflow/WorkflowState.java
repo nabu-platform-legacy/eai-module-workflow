@@ -10,6 +10,9 @@ public class WorkflowState {
 	private String name, description;
 	// the possible transitions out of this state
 	private List<WorkflowTransition> transitions;
+	// you can extend this state with other states
+	// this allows for reusable transitions
+	private List<String> extensions;
 	// visual positioning
 	private double x, y;
 	
@@ -54,5 +57,10 @@ public class WorkflowState {
 	public void setY(double y) {
 		this.y = y;
 	}
-	
+	public List<String> getExtensions() {
+		return extensions;
+	}
+	public void setExtensions(List<String> extensions) {
+		this.extensions = extensions;
+	}
 }
