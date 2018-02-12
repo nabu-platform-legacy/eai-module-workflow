@@ -15,6 +15,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import javafx.beans.binding.DoubleExpression;
+import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ReadOnlyDoubleProperty;
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.value.ChangeListener;
@@ -270,7 +271,8 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		
 		rectangle.getContainer().prefWidthProperty().bind(label.prefWidthProperty());
 		
-		MovablePane movable = MovablePane.makeMovable(rectangle.getContainer());
+		BooleanProperty locked = MainController.getInstance().hasLock(workflow.getId());
+		MovablePane movable = MovablePane.makeMovable(rectangle.getContainer(), locked);
 //		movable.setGridSize(10);
 		// make sure we update position changes
 		movable.xProperty().addListener(new ChangeListener<Number>() {
@@ -314,6 +316,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 				
 				// TODO: extensions should really be enumerated and should persist ids instead of names...
 				SimplePropertyUpdater createUpdater = EAIDeveloperUtils.createUpdater(state, null, "x", "y", "transitions.*", "id", "name");
+				createUpdater.setSourceId(workflow.getId());
 				MainController.getInstance().showProperties(createUpdater, right, true);
 			
 				split.getItems().addAll(leftScrollPane, right);
@@ -339,7 +342,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		rectangle.getContent().addEventHandler(KeyEvent.KEY_PRESSED, new EventHandler<KeyEvent>() {
 			@Override
 			public void handle(KeyEvent event) {
-				if (event.getCode() == KeyCode.DELETE) {
+				if (event.getCode() == KeyCode.DELETE && locked.get()) {
 					Confirm.confirm(ConfirmType.QUESTION, "Delete state?", "Are you sure you want to delete the state '" + state.getName() + "'", new EventHandler<ActionEvent>() {
 						@Override
 						public void handle(ActionEvent arg0) {
@@ -377,7 +380,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		rectangle.getContent().addEventHandler(MouseEvent.DRAG_DETECTED, new EventHandler<MouseEvent>() {
 			@Override
 			public void handle(MouseEvent event) {
-				if (event.isControlDown()) {
+				if (event.isControlDown() && locked.get()) {
 					draggingLine = new Line();
 					draggingLine.startXProperty().bind(rectangle.rightAnchorXProperty());
 					draggingLine.startYProperty().bind(rectangle.rightAnchorYProperty());
@@ -698,7 +701,8 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 			}
 		});
 		
-		MovablePane movableCircle = MovablePane.makeMovable(pane);
+		BooleanProperty locked = MainController.getInstance().hasLock(workflow.getId());
+		MovablePane movableCircle = MovablePane.makeMovable(pane, locked);
 		movableCircle.xProperty().addListener(new ChangeListener<Number>() {
 			@Override
 			public void changed(ObservableValue<? extends Number> arg0, Number arg1, Number arg2) {
@@ -787,6 +791,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 						return true;
 					}
 				}, "x", "y", "targetStateId", "id", "name");
+				createUpdater.setSourceId(workflow.getId());
 				MainController.getInstance().showProperties(createUpdater, right, true);
 			
 				split.getItems().addAll(leftScrollPane, right);
@@ -794,7 +799,9 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 				mapPane.getChildren().add(split);
 				// add an editor for the transient state
 				try {
-					new StructureGUIManager().display(MainController.getInstance(), left, workflow.getStructures().get(transition.getId()));
+					StructureGUIManager structureGUIManager = new StructureGUIManager();
+					structureGUIManager.setActualId(workflow.getId());
+					structureGUIManager.display(MainController.getInstance(), left, workflow.getStructures().get(transition.getId()));
 				}
 				catch (Exception e) {
 					throw new RuntimeException(e);
@@ -816,7 +823,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		EventHandler<KeyEvent> keyEventHandler = new EventHandler<KeyEvent>() {
 			@Override
 			public void handle(KeyEvent event) {
-				if (event.getCode() == KeyCode.DELETE) {
+				if (event.getCode() == KeyCode.DELETE && locked.get()) {
 					Confirm.confirm(ConfirmType.QUESTION, "Delete transition?", "Are you sure you want to delete the transition '" + transition.getName() + "'", new EventHandler<ActionEvent>() {
 						@Override
 						public void handle(ActionEvent arg0) {
@@ -850,7 +857,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		line2.addEventHandler(KeyEvent.KEY_PRESSED, new EventHandler<KeyEvent>() {
 			@Override
 			public void handle(KeyEvent event) {
-				if (event.getCode() == KeyCode.DELETE) {
+				if (event.getCode() == KeyCode.DELETE && locked.get()) {
 					removeTransition(workflow, state, transition);
 				}
 			}
