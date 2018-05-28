@@ -1,47 +1,49 @@
 package be.nabu.eai.module.workflow.transition;
 
-import java.net.URI;
+import java.io.IOException;
+import java.nio.charset.Charset;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
+import be.nabu.eai.module.web.application.WebApplication;
+import be.nabu.eai.module.web.application.WebFragment;
+import be.nabu.eai.module.web.application.api.RESTFragment;
 import be.nabu.eai.module.workflow.Workflow;
+import be.nabu.eai.module.workflow.WorkflowRESTListener;
 import be.nabu.eai.module.workflow.WorkflowState;
 import be.nabu.eai.module.workflow.WorkflowTransition;
 import be.nabu.eai.repository.EAIRepositoryUtils;
+import be.nabu.libs.authentication.api.Permission;
+import be.nabu.libs.events.api.EventSubscription;
+import be.nabu.libs.http.api.HTTPRequest;
+import be.nabu.libs.http.api.HTTPResponse;
+import be.nabu.libs.http.server.HTTPServerUtils;
 import be.nabu.libs.services.api.DefinedService;
 import be.nabu.libs.services.api.ServiceInstance;
 import be.nabu.libs.services.api.ServiceInterface;
-import be.nabu.libs.types.SimpleTypeWrapperFactory;
-import be.nabu.libs.types.api.ComplexType;
-import be.nabu.libs.types.base.ComplexElementImpl;
-import be.nabu.libs.types.base.SimpleElementImpl;
-import be.nabu.libs.types.base.ValueImpl;
-import be.nabu.libs.types.properties.CommentProperty;
-import be.nabu.libs.types.properties.MinOccursProperty;
-import be.nabu.libs.types.structure.Structure;
+import be.nabu.libs.types.api.Element;
+import be.nabu.libs.types.api.Type;
 
-public class WorkflowTransitionService implements DefinedService {
+public class WorkflowTransitionService implements DefinedService, WebFragment, RESTFragment {
 
-	private boolean isInitial;
-	private WorkflowTransition transition;
-	private Workflow workflow;
 	private String id;
 
-	private Structure input, output;
-	private WorkflowState fromState;
 	private String name;
+	private WorkflowTransitionServiceInterface serviceInterface;
 	
-	public WorkflowTransitionService(Workflow workflow, WorkflowState fromState, WorkflowTransition transition, boolean isInitial) {
-		this.workflow = workflow;
-		this.fromState = fromState;
-		this.transition = transition;
-		this.isInitial = isInitial;
-		name = EAIRepositoryUtils.stringToField(transition.getName());
-		this.id = workflow.getId() + ".services." + (isInitial ? "initial" : "transition") + "." + name;
+	public WorkflowTransitionService(WorkflowTransitionServiceInterface iface) {
+		this.serviceInterface = iface;
+		name = EAIRepositoryUtils.stringToField(iface.getTransition().getName());
+		this.id = iface.getWorkflow().getId() + ".services." + (iface.isInitial() ? "initial" : "transition") + "." + name;
 	}
 	
 	@Override
 	public ServiceInterface getServiceInterface() {
-		return new WorkflowTransitionServiceInterface();
+		return serviceInterface;
 	}
 
 	@Override
@@ -63,73 +65,122 @@ public class WorkflowTransitionService implements DefinedService {
 		return name;
 	}
 
-	public class WorkflowTransitionServiceInterface implements ServiceInterface {
-		@Override
-		public ComplexType getInputDefinition() {
-			if (input == null) {
-				synchronized(WorkflowTransitionService.this) {
-					if (input == null) {
-						Structure input = new Structure();
-						input.setName("input");
-						if (!isInitial) {
-							input.add(new SimpleElementImpl<String>("workflowId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input));
-						}
-						else {
-							input.add(new SimpleElementImpl<String>("parentId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "The id of the parent workflow")));
-							input.add(new SimpleElementImpl<String>("batchId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "The id of the batch it belongs to")));
-							input.add(new SimpleElementImpl<String>("correlationId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "A free to choose correlation id that can link this workflow to something else")));
-							input.add(new SimpleElementImpl<String>("contextId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "A contextually relevant id for this instance of the workflow, for example an invoice number")));
-							input.add(new SimpleElementImpl<String>("groupId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "The contextually relevant group id for this instance of the workflow, for example a customer id")));
-							input.add(new SimpleElementImpl<String>("workflowType", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "The contextually relevant type of this workflow instance, for example a message type")));
-							input.add(new SimpleElementImpl<URI>("uri", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(URI.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "A lot of workflows revolve around data, if this is the case, log the uri for the relevant data here")));
-						}
-						input.add(new ComplexElementImpl("state", (ComplexType) workflow.getRepository().resolve(workflow.getId() + ".types.states." + EAIRepositoryUtils.stringToField(fromState.getName())), input));
-						input.add(new ComplexElementImpl("transition", (ComplexType) workflow.getRepository().resolve(workflow.getId() + ".types.transitions." + EAIRepositoryUtils.stringToField(transition.getName())), input));
-//						input.add(new SimpleElementImpl<Boolean>("asynchronous", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(Boolean.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "Whether or not the execution should be done asynchronously")));
-						WorkflowTransitionService.this.input = input;
-					}
-				}
-			}
-			return input;
-		}
-
-		@Override
-		public ComplexType getOutputDefinition() {
-			if (output == null) {
-				synchronized(WorkflowTransitionService.this) {
-					if (output == null) {
-						Structure output = new Structure();
-						output.setName("output");
-						if (isInitial) {
-							output.add(new SimpleElementImpl<String>("workflowId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), output));
-						}
-						WorkflowTransitionService.this.output = output;
-					}
-				}
-			}
-			return output;
-		}
-
-		@Override
-		public ServiceInterface getParent() {
-			return null;
-		}
-	}
-
 	public boolean isInitial() {
-		return isInitial;
+		return serviceInterface.isInitial();
 	}
 
 	public WorkflowTransition getTransition() {
-		return transition;
+		return serviceInterface.getTransition();
 	}
 
 	public Workflow getWorkflow() {
-		return workflow;
+		return serviceInterface.getWorkflow();
 	}
 
 	public WorkflowState getFromState() {
-		return fromState;
+		return serviceInterface.getFromState();
+	}
+
+
+	private Map<String, EventSubscription<?, ?>> subscriptions = new HashMap<String, EventSubscription<?, ?>>();
+
+	private String getKey(WebApplication artifact, String path) {
+		return artifact.getId() + ":" + path;
+	}
+	
+	@Override
+	public void start(WebApplication artifact, String path) throws IOException {
+		String key = getKey(artifact, path);
+		if (subscriptions.containsKey(key)) {
+			stop(artifact, path);
+		}
+		String restPath = artifact.getServerPath();
+		if (path != null && !path.isEmpty() && !path.equals("/")) {
+			if (!restPath.endsWith("/")) {
+				restPath += "/";
+			}
+			restPath += path.replaceFirst("^[/]+", "");
+		}
+		synchronized(subscriptions) {
+			WorkflowRESTListener listener = new WorkflowRESTListener(
+				artifact,
+				serviceInterface.getWorkflow(), 
+				Charset.defaultCharset(),
+				this
+			);
+			EventSubscription<HTTPRequest, HTTPResponse> subscription = artifact.getDispatcher().subscribe(HTTPRequest.class, listener);
+			subscription.filter(HTTPServerUtils.limitToPath(restPath));
+			subscriptions.put(key, subscription);
+		}
+	}
+
+	@Override
+	public void stop(WebApplication artifact, String path) {
+		String key = getKey(artifact, path);
+		if (subscriptions.containsKey(key)) {
+			synchronized(subscriptions) {
+				if (subscriptions.containsKey(key)) {
+					subscriptions.get(key).unsubscribe();
+					subscriptions.remove(key);
+				}
+			}
+		}
+	}
+
+	@Override
+	public List<Permission> getPermissions(WebApplication artifact, String path) {
+		return new ArrayList<Permission>();
+	}
+
+	@Override
+	public boolean isStarted(WebApplication artifact, String path) {
+		return subscriptions.containsKey(getKey(artifact, path));
+	}
+
+	@Override
+	public String getPath() {
+		String cleanName = EAIRepositoryUtils.stringToField(getName());
+		return getWorkflow().getId() + "/" + cleanName;
+	}
+
+	@Override
+	public String getMethod() {
+		return isInitial() ? "POST" : "PUT";
+	}
+
+	@Override
+	public List<String> getConsumes() {
+		return Arrays.asList("application/json", "application/xml");
+	}
+
+	@Override
+	public List<String> getProduces() {
+		return Arrays.asList("application/json", "application/xml");
+	}
+
+	@Override
+	public Type getInput() {
+		return getServiceInterface().getInputDefinition();
+	}
+
+	@Override
+	public Type getOutput() {
+		return getServiceInterface().getOutputDefinition();
+	}
+
+	@Override
+	public List<Element<?>> getQueryParameters() {
+		return new ArrayList<Element<?>>();
+	}
+
+	@Override
+	public List<Element<?>> getHeaderParameters() {
+		return new ArrayList<Element<?>>();
+	}
+
+	@Override
+	public List<Element<?>> getPathParameters() {
+		return new ArrayList<Element<?>>();
 	}
 	
 }

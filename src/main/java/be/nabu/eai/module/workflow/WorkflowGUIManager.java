@@ -1,7 +1,6 @@
 package be.nabu.eai.module.workflow;
 
 import java.io.IOException;
-import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -14,8 +13,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import javafx.beans.binding.BooleanBinding;
+import javafx.beans.binding.DoubleBinding;
 import javafx.beans.binding.DoubleExpression;
 import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.ReadOnlyDoubleProperty;
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.value.ChangeListener;
@@ -44,8 +46,6 @@ import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Shape;
-import nabu.misc.workflow.types.WorkflowInstance;
-import nabu.misc.workflow.types.WorkflowTransitionInstance;
 import be.nabu.eai.developer.MainController;
 import be.nabu.eai.developer.controllers.VMServiceController;
 import be.nabu.eai.developer.managers.base.BaseArtifactGUIInstance;
@@ -61,6 +61,7 @@ import be.nabu.eai.developer.util.EAIDeveloperUtils.PropertyUpdaterListener;
 import be.nabu.eai.module.services.vm.VMServiceGUIManager;
 import be.nabu.eai.module.types.structure.StructureGUIManager;
 import be.nabu.eai.module.workflow.gui.RectangleWithHooks;
+import be.nabu.eai.module.workflow.transition.WorkflowTransitionMappingInterface;
 import be.nabu.eai.repository.EAIRepositoryUtils;
 import be.nabu.eai.repository.api.Entry;
 import be.nabu.eai.repository.api.ModifiableEntry;
@@ -72,19 +73,16 @@ import be.nabu.jfx.control.tree.drag.MouseLocation;
 import be.nabu.jfx.control.tree.drag.TreeDragDrop;
 import be.nabu.libs.property.api.Property;
 import be.nabu.libs.property.api.Value;
+import be.nabu.libs.services.api.DefinedServiceInterface;
 import be.nabu.libs.services.vm.Pipeline;
+import be.nabu.libs.services.vm.PipelineInterfaceProperty;
 import be.nabu.libs.services.vm.SimpleVMServiceDefinition;
 import be.nabu.libs.services.vm.api.Step;
 import be.nabu.libs.services.vm.api.VMService;
 import be.nabu.libs.services.vm.step.Sequence;
 import be.nabu.libs.types.SimpleTypeWrapperFactory;
-import be.nabu.libs.types.api.ComplexType;
-import be.nabu.libs.types.base.ComplexElementImpl;
 import be.nabu.libs.types.base.SimpleElementImpl;
 import be.nabu.libs.types.base.ValueImpl;
-import be.nabu.libs.types.java.BeanResolver;
-import be.nabu.libs.types.properties.MaxOccursProperty;
-import be.nabu.libs.types.properties.MinOccursProperty;
 import be.nabu.libs.types.structure.DefinedStructure;
 import be.nabu.libs.types.structure.Structure;
 import be.nabu.libs.validator.api.ValidationMessage;
@@ -453,16 +451,21 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 											transition.setX(state.getX() + rectangleWithHooks.getContent().getWidth() + ((child.getX() - (state.getX() + rectangleWithHooks.getContent().getWidth())) / 2));
 											transition.setY(state.getY() + (rectangleWithHooks.getContent().getHeight() / 2) - 5);
 	
+											
 											Structure input = new Structure();
 											input.setName("input");
+											/*
 											input.add(new ComplexElementImpl("workflow", (ComplexType) BeanResolver.getInstance().resolve(WorkflowInstance.class), input));
 											input.add(new ComplexElementImpl("properties", workflow.getStructures().get("properties"), input));
 											input.add(new ComplexElementImpl("state", workflow.getStructures().get(child.getId()), input));
 											input.add(new ComplexElementImpl("transition", workflow.getStructures().get(transition.getId()), input));
 											input.add(new ComplexElementImpl("history", (ComplexType) BeanResolver.getInstance().resolve(WorkflowTransitionInstance.class), input, new ValueImpl<Integer>(MaxOccursProperty.getInstance(), 0), new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
+											*/
 											
 											Structure output = new Structure();
 											output.setName("output");
+											
+											/*
 											output.add(new ComplexElementImpl("properties", workflow.getStructures().get("properties"), output));
 											output.add(new ComplexElementImpl("state", workflow.getStructures().get(state.getId()), output));
 											output.add(new SimpleElementImpl<String>("workflowType", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), output, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
@@ -471,8 +474,14 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 											output.add(new SimpleElementImpl<String>("log", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), output, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
 											output.add(new SimpleElementImpl<String>("code", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), output, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
 											output.add(new SimpleElementImpl<URI>("uri", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(URI.class), output, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
+											*/
 											
 											Pipeline pipeline = new Pipeline(input, output);
+											
+//											WorkflowTransitionServiceInterface iface = new WorkflowTransitionServiceInterface(workflow, child, transition);
+											WorkflowTransitionMappingInterface iface = new WorkflowTransitionMappingInterface(workflow, child, transition);
+											pipeline.setProperty(new ValueImpl<DefinedServiceInterface>(PipelineInterfaceProperty.getInstance(), iface));
+											
 											SimpleVMServiceDefinition service = new SimpleVMServiceDefinition(pipeline);
 											service.setRoot(new Sequence());
 											be.nabu.libs.services.vm.step.Map map = new be.nabu.libs.services.vm.step.Map();
@@ -656,6 +665,9 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		circle.getStyleClass().add("connectionLine");
 		circle.setFill(Color.TRANSPARENT);
 		Label label = new Label(transition.getName());
+		if (transition.getQuery() != null && !transition.getQuery().trim().isEmpty()) {
+			label.setText(label.getText() + ("true".equals(transition.getQuery()) ? "" : "\n" + transition.getQuery()));
+		}
 		label.getStyleClass().add("workflow-name");
 		box.getChildren().addAll(circle);
 		pane.getChildren().add(box);
@@ -666,8 +678,38 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		
 		AnchorPane labelPane = new AnchorPane();
 		labelPane.setManaged(false);
+
+		RectangleWithHooks stateRectangle = states.get(state.getId());
+		DoubleBinding subtract = stateRectangle.getContainer().layoutYProperty().subtract(pane.layoutYProperty());
 		labelPane.layoutXProperty().bind(circle.layoutXProperty().add(pane.layoutXProperty()).subtract(label.widthProperty().divide(2)));
-		labelPane.layoutYProperty().bind(circle.layoutYProperty().add(pane.layoutYProperty()).add(circle.radiusProperty().multiply(2)));
+//		labelPane.layoutYProperty().bind(circle.layoutYProperty().add(pane.layoutYProperty()).add(circle.radiusProperty().multiply(2)));
+
+		// initial: if the value is positive, the rectangle is lower then the circle, we draw the text above
+		if (subtract.get() >= 0) {
+			labelPane.layoutYProperty().bind(pane.layoutYProperty().subtract(transition.getQuery() == null ? 40 : 60));
+		}
+		// otherwise we draw the text below
+		else {
+			labelPane.layoutYProperty().bind(circle.layoutYProperty().add(pane.layoutYProperty()).add(circle.radiusProperty().multiply(2)));
+		}
+		
+		subtract.addListener(new ChangeListener<Number>() {
+			@Override
+			public void changed(ObservableValue<? extends Number> arg0, Number arg1, Number arg2) {
+				// if the value is positive, the rectangle is lower then the circle, we draw the text above
+				if (arg2.doubleValue() >= 0) {
+					labelPane.layoutYProperty().unbind();
+					labelPane.layoutYProperty().bind(pane.layoutYProperty().subtract(transition.getQuery() == null ? 40 : 60));
+				}
+				// otherwise we draw the text below
+				else {
+					labelPane.layoutYProperty().unbind();
+					labelPane.layoutYProperty().bind(circle.layoutYProperty().add(pane.layoutYProperty()).add(circle.radiusProperty().multiply(2)));
+				}
+			}
+		});
+		
+		
 		labelPane.getChildren().add(label);
 		label.setVisible(false);
 		shapes.add(labelPane);

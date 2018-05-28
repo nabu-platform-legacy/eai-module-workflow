@@ -3,6 +3,7 @@ package be.nabu.eai.module.workflow;
 import java.io.IOException;
 import java.text.ParseException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -10,7 +11,9 @@ import java.util.Map;
 
 import be.nabu.eai.module.services.vm.VMServiceManager;
 import be.nabu.eai.module.types.structure.StructureManager;
+import be.nabu.eai.module.workflow.transition.WorkflowTransitionMappingInterface;
 import be.nabu.eai.module.workflow.transition.WorkflowTransitionService;
+import be.nabu.eai.module.workflow.transition.WorkflowTransitionServiceInterface;
 import be.nabu.eai.repository.EAINode;
 import be.nabu.eai.repository.EAIRepositoryUtils;
 import be.nabu.eai.repository.EAIResourceRepository;
@@ -123,6 +126,22 @@ public class WorkflowManager extends JAXBArtifactManager<WorkflowConfiguration, 
 			for (DefinedStructure structure : workflow.getStructures().values()) {
 				containerRepository.alias(entry.getId() + ":" + structure.getId(), structure.getId());
 			}
+			
+			// we also generate ad-hoc interfaces for the services, this makes it a lot easier to update the interface (e.g. add new fields) later on
+			if (workflow.getConfig().getStates() != null) {
+				for (WorkflowState state : workflow.getConfig().getStates()) {
+					if (state.getTransitions() != null) {
+						for (WorkflowTransition transition : state.getTransitions()) {
+//							WorkflowTransitionServiceInterface iface = new WorkflowTransitionServiceInterface(workflow, state, transition);
+//							iface.setRepository(containerRepository);
+//							containerRepository.addArtifacts(Arrays.asList(iface));
+							WorkflowTransitionMappingInterface iface = new WorkflowTransitionMappingInterface(workflow, state, transition);
+							containerRepository.addArtifacts(Arrays.asList(iface));
+						}
+					}
+				}
+			}
+			
 			// so we can only load them after the documents are added to the tree
 			ResourceContainer<?> services = (ResourceContainer<?>) privateDirectory.getChild("services");
 			if (services != null) {
@@ -242,7 +261,7 @@ public class WorkflowManager extends JAXBArtifactManager<WorkflowConfiguration, 
 			for (WorkflowTransition transition : state.getTransitions()) {
 				EAINode node = new EAINode();
 				node.setArtifactClass(DefinedService.class);
-				WorkflowTransitionService service = new WorkflowTransitionService(artifact, state, transition, true);
+				WorkflowTransitionService service = new WorkflowTransitionService(new WorkflowTransitionServiceInterface(artifact, state, transition));
 				node.setArtifact(service);
 				node.setLeaf(true);
 				Entry childEntry = new MemoryEntry(parent.getRepository(), initial, node, service.getId(), service.getName());
@@ -260,7 +279,7 @@ public class WorkflowManager extends JAXBArtifactManager<WorkflowConfiguration, 
 				for (WorkflowTransition transition : state.getTransitions()) {
 					EAINode node = new EAINode();
 					node.setArtifactClass(DefinedService.class);
-					WorkflowTransitionService service = new WorkflowTransitionService(artifact, state, transition, false);
+					WorkflowTransitionService service = new WorkflowTransitionService(new WorkflowTransitionServiceInterface(artifact, state, transition));
 					node.setArtifact(service);
 					node.setLeaf(true);
 					Entry childEntry = new MemoryEntry(parent.getRepository(), transitions, node, service.getId(), service.getName());

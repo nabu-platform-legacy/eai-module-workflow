@@ -2,7 +2,7 @@ package be.nabu.eai.module.workflow;
 
 import java.util.List;
 
-import javax.xml.bind.annotation.XmlTransient;
+import be.nabu.eai.api.Hidden;
 
 // can not directly refer to target state as this may result in circular references!!
 // must refer to the id of the target state, separate resolving
@@ -96,6 +96,7 @@ public class WorkflowTransition implements Comparable<WorkflowTransition> {
 	}
 
 	// should not be persisted but...in a hurry! @hackathon gsk 2018-01-18
+	@Hidden
 	public String getOperationId() {
 		return operationId;
 	}

@@ -5,6 +5,7 @@ import java.util.List;
 
 import javax.validation.constraints.NotNull;
 import javax.xml.bind.annotation.XmlRootElement;
+import javax.xml.bind.annotation.XmlType;
 import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 
 import be.nabu.eai.api.InterfaceFilter;
@@ -14,12 +15,14 @@ import be.nabu.libs.artifacts.api.DataSourceProviderArtifact;
 import be.nabu.libs.services.api.DefinedService;
 
 @XmlRootElement(name = "workflow")
+@XmlType(propOrder = { "connection", "provider", "states", "permissionService", "roleService", "tokenValidatorService", "transitionListeners" })
 public class WorkflowConfiguration {
 	
 	private DataSourceProviderArtifact connection;
 	private WorkflowProvider provider;
 	private List<WorkflowState> states;
 	private DefinedService permissionService, roleService, tokenValidatorService;
+	private List<DefinedService> transitionListeners;
 	
 	@NotNull
 	@XmlJavaTypeAdapter(value = ArtifactXMLAdapter.class)
@@ -74,5 +77,15 @@ public class WorkflowConfiguration {
 	public void setConnection(DataSourceProviderArtifact connection) {
 		this.connection = connection;
 	}
+	
+	@XmlJavaTypeAdapter(value = ArtifactXMLAdapter.class)
+	@InterfaceFilter(implement = "be.nabu.eai.module.workflow.api.WorkflowListener.transition")
+	public List<DefinedService> getTransitionListeners() {
+		return transitionListeners;
+	}
+	public void setTransitionListeners(List<DefinedService> transitionListeners) {
+		this.transitionListeners = transitionListeners;
+	}
+	
 	
 }

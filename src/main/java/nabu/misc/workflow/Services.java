@@ -25,6 +25,7 @@ import be.nabu.eai.module.workflow.Workflow;
 import be.nabu.eai.module.workflow.WorkflowState;
 import be.nabu.eai.module.workflow.WorkflowTransition;
 import be.nabu.eai.module.workflow.transition.WorkflowTransitionService;
+import be.nabu.eai.module.workflow.transition.WorkflowTransitionServiceInterface;
 import be.nabu.eai.repository.EAIResourceRepository;
 import be.nabu.libs.artifacts.ArtifactResolverFactory;
 import be.nabu.libs.authentication.api.RoleHandler;
@@ -85,7 +86,7 @@ public class Services {
 			throw new IllegalArgumentException("No initial transition found that matches: " + transitionId);
 		}
 		
-		WorkflowTransitionService service = new WorkflowTransitionService(resolve, state, transition, true);
+		WorkflowTransitionService service = new WorkflowTransitionService(new WorkflowTransitionServiceInterface(resolve, state, transition));
 		ServiceRuntime runtime = new ServiceRuntime(service, executionContext);
 		
 		ComplexContent input = service.getServiceInterface().getInputDefinition().newInstance();
@@ -125,7 +126,7 @@ public class Services {
 			throw new IllegalArgumentException("No transition found that matches: " + transitionId);
 		}
 		
-		WorkflowTransitionService service = new WorkflowTransitionService(resolve, state, transition, false);
+		WorkflowTransitionService service = new WorkflowTransitionService(new WorkflowTransitionServiceInterface(resolve, state, transition));
 		ServiceRuntime runtime = new ServiceRuntime(service, executionContext);
 		
 		ComplexContent input = service.getServiceInterface().getInputDefinition().newInstance();

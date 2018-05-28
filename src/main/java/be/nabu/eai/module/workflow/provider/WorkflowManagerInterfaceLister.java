@@ -33,6 +33,7 @@ private static Collection<InterfaceDescription> descriptions = null;
 					descriptions.add(new InterfaceDescriptionImpl("Workflow", "Get Batch", "be.nabu.eai.module.workflow.provider.WorkflowManager.getBatch"));
 					descriptions.add(new InterfaceDescriptionImpl("Workflow", "Get Batches", "be.nabu.eai.module.workflow.provider.WorkflowManager.getBatches"));
 					descriptions.add(new InterfaceDescriptionImpl("Workflow", "Get Amount of Workflows", "be.nabu.eai.module.workflow.provider.WorkflowManager.getAmountOfWorkflows"));
+					descriptions.add(new InterfaceDescriptionImpl("Workflow", "Workflow listener", "be.nabu.eai.module.workflow.api.WorkflowListener.transition"));
 					WorkflowManagerInterfaceLister.descriptions = descriptions;
 				}
 			}

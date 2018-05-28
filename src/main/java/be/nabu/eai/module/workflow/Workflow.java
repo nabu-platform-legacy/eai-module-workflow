@@ -29,6 +29,7 @@ import be.nabu.eai.module.web.application.WebApplication;
 import be.nabu.eai.module.web.application.WebFragment;
 import be.nabu.eai.module.web.application.api.RESTFragment;
 import be.nabu.eai.module.web.application.api.RESTFragmentProvider;
+import be.nabu.eai.module.workflow.api.WorkflowListener;
 import be.nabu.eai.module.workflow.provider.WorkflowManager;
 import be.nabu.eai.module.workflow.provider.WorkflowProvider;
 import be.nabu.eai.module.workflow.transition.WorkflowTransitionService;
@@ -55,6 +56,7 @@ import be.nabu.libs.property.api.Value;
 import be.nabu.libs.resources.api.ResourceContainer;
 import be.nabu.libs.services.ServiceRuntime;
 import be.nabu.libs.services.ServiceUtils;
+import be.nabu.libs.services.api.DefinedService;
 import be.nabu.libs.services.api.ServiceException;
 import be.nabu.libs.services.pojo.POJOUtils;
 import be.nabu.libs.services.vm.api.VMService;
@@ -311,6 +313,9 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 					}
 				}
 			}
+			
+			WorkflowState sourceState = workflow.getStateId() != null ? getStateById(workflow.getStateId()) : null;
+			
 			PermissionHandler permissionHandler = getPermissionHandler();
 			if (permissionHandler != null && !permissionHandler.hasPermission(token, workflow.getId(), transition.getName())) {
 				throw new ServiceException("WORKFLOW-5", "The user does not have permission to run this transition");
@@ -510,6 +515,8 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 					}
 				});
 				
+				callListeners(workflow, transition, sourceState, targetState, token);
+				
 				// check if the batch is already done, if so we can continue
 				if (batch != null) {
 					if (!continueBatch(batch)) {
@@ -604,6 +611,20 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 			}
 			else {
 				throw new ServiceException(e);
+			}
+		}
+	}
+
+	public void callListeners(WorkflowInstance workflow, WorkflowTransition transition, WorkflowState fromState, WorkflowState toState, Token token) {
+		if (getConfig().getTransitionListeners() != null) {
+			for (DefinedService service : getConfig().getTransitionListeners()) {
+				WorkflowListener listener = POJOUtils.newProxy(WorkflowListener.class, service, getRepository(), SystemPrincipal.ROOT);
+				try {
+					listener.transition(workflow, transition, fromState, toState, token);
+				}
+				catch (Exception e) {
+					fire("listener", 2, workflow.getId(), "Could not execute workflow listener", Notification.format(e), Severity.ERROR);
+				}
 			}
 		}
 	}
@@ -830,7 +851,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 		fullPath += getId();
 		
 		EventDispatcher dispatcher = artifact.getConfiguration().getVirtualHost().getDispatcher();
-		EventSubscription<HTTPRequest, HTTPResponse> subscription = dispatcher.subscribe(HTTPRequest.class, new WorkflowListener(artifact, this, Charset.defaultCharset()));
+		EventSubscription<HTTPRequest, HTTPResponse> subscription = dispatcher.subscribe(HTTPRequest.class, new WorkflowRESTListener(artifact, this, Charset.defaultCharset(), null));
 		subscription.filter(HTTPServerUtils.limitToPath(fullPath));
 		
 		List<EventSubscription<?, ?>> list = subscriptions.get(key);
