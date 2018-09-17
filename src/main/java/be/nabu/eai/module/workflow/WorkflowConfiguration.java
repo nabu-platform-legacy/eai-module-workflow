@@ -3,13 +3,13 @@ package be.nabu.eai.module.workflow;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.validation.constraints.NotNull;
 import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.XmlType;
 import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 
 import be.nabu.eai.api.InterfaceFilter;
 import be.nabu.eai.module.workflow.provider.WorkflowProvider;
+import be.nabu.eai.repository.EAIResourceRepository;
 import be.nabu.eai.repository.jaxb.ArtifactXMLAdapter;
 import be.nabu.libs.artifacts.api.DataSourceProviderArtifact;
 import be.nabu.libs.services.api.DefinedService;
@@ -24,9 +24,11 @@ public class WorkflowConfiguration {
 	private DefinedService permissionService, roleService, tokenValidatorService;
 	private List<DefinedService> transitionListeners;
 	
-	@NotNull
 	@XmlJavaTypeAdapter(value = ArtifactXMLAdapter.class)
 	public WorkflowProvider getProvider() {
+		if (provider == null) {
+			provider = (WorkflowProvider) EAIResourceRepository.getInstance().resolve("nabu.misc.workflow.providers.basic.provider");
+		}
 		return provider;
 	}
 	public void setProvider(WorkflowProvider provider) {

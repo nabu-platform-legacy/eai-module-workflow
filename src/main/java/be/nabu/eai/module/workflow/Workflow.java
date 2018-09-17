@@ -291,7 +291,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 		return null;
 	}
 	
-	public void run(WorkflowInstance workflow, List<WorkflowTransitionInstance> history, List<WorkflowInstanceProperty> properties, WorkflowTransition transition, Token token, ComplexContent input) throws ServiceException {
+	public void run(String connectionId, WorkflowInstance workflow, List<WorkflowTransitionInstance> history, List<WorkflowInstanceProperty> properties, WorkflowTransition transition, Token token, ComplexContent input) throws ServiceException {
 		try {
 			// check if the current user is allowed to run it
 			TokenValidator tokenValidator = getTokenValidator();
@@ -328,7 +328,6 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 			}
 	
 			WorkflowManager workflowManager = getConfig().getProvider().getWorkflowManager();
-			String connectionId = getConfig().getConnection() == null ? null : getConfig().getConnection().getId();
 			
 			Collections.sort(history);
 			
@@ -348,7 +347,17 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 			newInstance.setId(UUID.randomUUID().toString().replace("-", ""));
 			newInstance.setDefinitionId(transition.getId());
 			newInstance.setFromStateId(workflow.getStateId());
-			newInstance.setToStateId(transition.getTargetStateId());
+			
+			// if the target state is the same as the source state, we are not updating the state, use the workflow state id
+			// this is useful for state extensions where the target state is a to-be-extended state and not an actual state
+			// it is currently unclear what to do if you target another to-be-extended state, this should probably not be allowed
+			WorkflowState transitionFromState = getTransitionFromState(transition.getId());
+			if (transitionFromState.getId().equals(transition.getTargetStateId())) {
+				newInstance.setToStateId(workflow.getStateId());
+			}
+			else {
+				newInstance.setToStateId(transition.getTargetStateId());
+			}
 	
 			if (token != null) {
 				newInstance.setActorId(token.getName());
@@ -400,6 +409,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 	
 			// now we run the transition service
 			ComplexContent mapInput = transitionService.getServiceInterface().getInputDefinition().newInstance();
+			mapInput.set("connectionId", connectionId);
 			mapInput.set("workflow", workflow);
 			mapInput.set("properties", propertiesToObject(properties));
 			mapInput.set("history", history);
@@ -416,9 +426,13 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 			WorkflowState targetState = getStateById(transition.getTargetStateId());
 			boolean isFinalState = targetState.getTransitions() == null || targetState.getTransitions().isEmpty();
 			ComplexContent output;
-			try {
-				ServiceRuntime serviceRuntime = new ServiceRuntime(transitionService, getRepository().newExecutionContext(token));
+			ServiceRuntime serviceRuntime = new ServiceRuntime(transitionService, getRepository().newExecutionContext(token));
+			boolean contextSet = false;
+			if (ServiceUtils.getServiceContext(serviceRuntime, false) == null) {
 				ServiceUtils.setServiceContext(serviceRuntime, workflow.getDefinitionId());
+				contextSet = true;
+			}
+			try {
 				output = serviceRuntime.run(mapInput);
 				
 				List<WorkflowInstanceProperty> propertiesToUpdate = new ArrayList<WorkflowInstanceProperty>();
@@ -464,6 +478,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 				String groupId = output == null ? null : (String) output.get("groupId");
 				String contextId = output == null ? null : (String) output.get("contextId");
 				String workflowType = output == null ? null : (String) output.get("workflowType");
+				String correlationId = output == null ? null : (String) output.get("correlationId");
 				
 				if (groupId != null) {
 					workflow.setGroupId(groupId);
@@ -474,6 +489,9 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 				if (workflowType != null) {
 					workflow.setWorkflowType(workflowType);
 				}
+				if (correlationId != null) {
+					workflow.setCorrelationId(correlationId);
+				}
 				
 				newInstance.setLog(output == null ? null : (String) output.get("log"));
 				newInstance.setCode(output == null ? null : (String) output.get("code"));
@@ -482,7 +500,8 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 				newInstance.setStopped(new Date());
 				newInstance.setTransitionState(batch != null ? Level.WAITING : Level.SUCCEEDED);
 				
-				workflow.setStateId(targetState.getId());
+				// use the possibly computed to state id from the transition
+				workflow.setStateId(newInstance.getToStateId());
 				
 				if (isFinalState) {
 					workflow.setTransitionState(Level.SUCCEEDED);
@@ -562,13 +581,18 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 				});
 				throw new ServiceException(e);
 			}
+			finally {
+				if (contextSet) {
+					ServiceUtils.setServiceContext(serviceRuntime, null);
+				}
+			}
 			
 			
 			// continue execution
 			if (!isFinalState) {
 				// make sure the current transition is reflected in the history
 				history.add(newInstance);
-				continueWorkflow(workflow, history, properties, token, targetState, output);
+				continueWorkflow(connectionId, workflow, history, properties, token, targetState, output);
 			}
 			// if this workflow was part of a batch and it's done, let's check that batch
 			else if (workflow.getBatchId() != null) {
@@ -596,7 +620,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 								targetParentState = parentFlowDefinition.getStateById(transitionInstance.getToStateId());
 							}
 						}
-						continueWorkflow(parentFlow, parentHistory, parentProperties, token, targetParentState, null);
+						continueWorkflow(connectionId, parentFlow, parentHistory, parentProperties, token, targetParentState, null);
 					}
 				}
 			}
@@ -629,7 +653,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 		}
 	}
 
-	private void continueWorkflow(WorkflowInstance workflow, List<WorkflowTransitionInstance> history, List<WorkflowInstanceProperty> properties, Token token, WorkflowState targetState, ComplexContent output) {
+	private void continueWorkflow(String connectionId, WorkflowInstance workflow, List<WorkflowTransitionInstance> history, List<WorkflowInstanceProperty> properties, Token token, WorkflowState targetState, ComplexContent output) {
 		ComplexContent content = getStateEvaluationType(targetState.getId()).newInstance();
 		content.set("properties", propertiesToObject(properties));
 		content.set("state", output == null ? null : output.get("state"));
@@ -656,7 +680,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 				try {
 					if (value != null && value) {
 						foundNext = true;
-						run(workflow, history, properties, possibleTransition, token, content);
+						run(connectionId, workflow, history, properties, possibleTransition, token, content);
 					}
 				}
 				catch (Exception e) {
@@ -733,6 +757,19 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 		for (WorkflowState state : getConfig().getStates()) {
 			if (state.getId().equals(id) || state.getName().equals(id)) {
 				return state;
+			}
+		}
+		return null;
+	}
+	
+	public WorkflowState getTransitionFromState(String transitionId) {
+		for (WorkflowState state : getConfig().getStates()) {
+			if (state.getTransitions() != null) {
+				for (WorkflowTransition transition : state.getTransitions()) {
+					if (transition.getId().equals(transitionId) || transition.getName().equals(transitionId)) {
+						return state;
+					}
+				}
 			}
 		}
 		return null;

@@ -41,6 +41,7 @@ public class WorkflowTransitionServiceInterface implements DefinedServiceInterfa
 					if (input == null) {
 						Structure input = new Structure();
 						input.setName("input");
+						input.add(new SimpleElementImpl<String>("connectionId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
 						if (!isInitial) {
 							input.add(new SimpleElementImpl<String>("workflowId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input));
 						}

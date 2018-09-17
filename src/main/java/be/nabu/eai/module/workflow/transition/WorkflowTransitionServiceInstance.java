@@ -13,6 +13,7 @@ import nabu.misc.workflow.types.WorkflowInstance;
 import nabu.misc.workflow.types.WorkflowInstanceProperty;
 import nabu.misc.workflow.types.WorkflowTransitionInstance;
 import nabu.misc.workflow.types.WorkflowInstance.Level;
+import be.nabu.eai.module.services.jdbc.RepositoryDataSourceResolver;
 import be.nabu.eai.module.workflow.Workflow;
 import be.nabu.eai.module.workflow.Workflow.TransactionableAction;
 import be.nabu.eai.module.workflow.WorkflowState;
@@ -38,13 +39,30 @@ public class WorkflowTransitionServiceInstance implements ServiceInstance {
 		return service;
 	}
 
+	private String getConnectionId(ComplexContent input) {
+		// you can give it in the input
+		String connectionId = input == null ? null : (String) input.get("connectionId");
+		// or configure it
+		if (connectionId == null) {
+			connectionId = service.getWorkflow().getConfig().getConnection() == null ? null : service.getWorkflow().getConfig().getConnection().getId();
+		}
+		// or we try to dynamically figure it out
+		if (connectionId == null) {
+			connectionId = new RepositoryDataSourceResolver().getDataSourceId(service.getWorkflow().getId());
+		}
+		return connectionId;
+	}
+	
 	@Override
 	public ComplexContent execute(ExecutionContext executionContext, ComplexContent input) throws ServiceException {
 		WorkflowInstance instance;
 		List<WorkflowTransitionInstance> history = new ArrayList<WorkflowTransitionInstance>();
 		List<WorkflowInstanceProperty> properties = new ArrayList<WorkflowInstanceProperty>();
 		
-		String connectionId = service.getWorkflow().getConfig().getConnection() == null ? null : service.getWorkflow().getConfig().getConnection().getId();
+		// transactions are a tricky bit, a workflow generally performs actions, some of which can not be reversed
+		// perhaps it is better to always locally transact and simply go back to a previous state or offer compensation mechanisms
+		// until this is cleared up, transactions are always managed by the workflow
+		final String connectionId = getConnectionId(input);
 		if (service.isInitial()) {
 			instance = new WorkflowInstance();
 			instance.setId(UUID.randomUUID().toString().replace("-", ""));
@@ -118,7 +136,7 @@ public class WorkflowTransitionServiceInstance implements ServiceInstance {
 				@Override
 				public void run() {
 					try {
-						service.getWorkflow().run(instance, history, properties, service.getTransition(), executionContext.getSecurityContext().getToken(), input);
+						service.getWorkflow().run(connectionId, instance, history, properties, service.getTransition(), executionContext.getSecurityContext().getToken(), input);
 					}
 					catch (ServiceException e) {
 						LoggerFactory.getLogger(service.getWorkflow().getId()).error("Transition '" + service.getId() + "' exited with exception", e);
@@ -128,7 +146,7 @@ public class WorkflowTransitionServiceInstance implements ServiceInstance {
 			}).start();
 		}
 		else {
-			service.getWorkflow().run(instance, history, properties, service.getTransition(), executionContext.getSecurityContext().getToken(), input);
+			service.getWorkflow().run(connectionId, instance, history, properties, service.getTransition(), executionContext.getSecurityContext().getToken(), input);
 		}
 		
 		ComplexContent output = service.getServiceInterface().getOutputDefinition().newInstance();

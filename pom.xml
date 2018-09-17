@@ -53,6 +53,11 @@
 			<scope>provided</scope>
 		</dependency>
 		<dependency>
+			<groupId>nabu</groupId>
+			<artifactId>eai-module-services-jdbc</artifactId>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
 			<groupId>be.nabu.libs.services</groupId>
 			<artifactId>services-vm</artifactId>
 			<scope>provided</scope>
