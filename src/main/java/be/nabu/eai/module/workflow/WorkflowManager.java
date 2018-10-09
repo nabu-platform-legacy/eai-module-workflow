@@ -29,11 +29,15 @@ import be.nabu.eai.repository.managers.base.JAXBArtifactManager;
 import be.nabu.eai.repository.resources.MemoryEntry;
 import be.nabu.eai.repository.resources.RepositoryEntry;
 import be.nabu.libs.artifacts.api.Artifact;
+import be.nabu.libs.property.ValueUtils;
 import be.nabu.libs.resources.api.ManageableContainer;
 import be.nabu.libs.resources.api.Resource;
 import be.nabu.libs.resources.api.ResourceContainer;
 import be.nabu.libs.services.api.DefinedService;
+import be.nabu.libs.services.api.DefinedServiceInterface;
+import be.nabu.libs.services.vm.PipelineInterfaceProperty;
 import be.nabu.libs.services.vm.api.VMService;
+import be.nabu.libs.types.base.ValueImpl;
 import be.nabu.libs.types.structure.DefinedStructure;
 import be.nabu.libs.validator.api.Validation;
 
@@ -153,6 +157,13 @@ public class WorkflowManager extends JAXBArtifactManager<WorkflowConfiguration, 
 					catch (Exception e) {
 						throw new RuntimeException(e);
 					}
+					
+					// make sure we set the pipeline interface property for consistent results
+					WorkflowTransition transition = workflow.getTransitionById(child.getName());
+					WorkflowState fromState = workflow.getTransitionFromState(child.getName());
+					WorkflowTransitionMappingInterface iface = new WorkflowTransitionMappingInterface(workflow, fromState, transition);
+					loaded.getPipeline().setProperty(new ValueImpl<DefinedServiceInterface>(PipelineInterfaceProperty.getInstance(), iface));
+					
 					workflow.getMappings().put(child.getName(), loaded);
 				}
 			}
@@ -179,8 +190,18 @@ public class WorkflowManager extends JAXBArtifactManager<WorkflowConfiguration, 
 		
 		// save services
 		for (String name : artifact.getMappings().keySet()) {
+			// make sure we update the iface on save every time, if you have renamed or moved the workflow it might be out of sync
+			VMService vmService = artifact.getMappings().get(name);
+			
+			DefinedServiceInterface iface = ValueUtils.getValue(PipelineInterfaceProperty.getInstance(), vmService.getPipeline().getProperties());
+			// unset the interface property for saving
+			vmService.getPipeline().setProperty(new ValueImpl<DefinedServiceInterface>(PipelineInterfaceProperty.getInstance(), null));
+			
 			ManageableContainer<?> create = (ManageableContainer<?>) services.create(name, Resource.CONTENT_TYPE_DIRECTORY);
-			messages.addAll(new VMServiceManager().save(new WrapperEntry(entry.getRepository(), entry, create, name), artifact.getMappings().get(name)));
+			messages.addAll(new VMServiceManager().save(new WrapperEntry(entry.getRepository(), entry, create, name), vmService));
+			
+			// reset the property after save
+			vmService.getPipeline().setProperty(new ValueImpl<DefinedServiceInterface>(PipelineInterfaceProperty.getInstance(), iface));
 		}
 		
 		// save structures

@@ -15,7 +15,7 @@ public class WorkflowProviderConfiguration {
 		createTransition, updateTransition, getTransitions,
 		createWorkflowProperties, updateWorkflowProperties, getWorkflowProperties,
 		getWorkflows, createBatch, updateBatch, calculateBatchState, getBatch, getBatches,
-		getAmountOfWorkflows;
+		getAmountOfWorkflows, mergeDefinition, getDefinition;
 
 	@InterfaceFilter(implement = "be.nabu.eai.module.workflow.provider.WorkflowManager.createWorkflow")
 	@XmlJavaTypeAdapter(value = ArtifactXMLAdapter.class)
@@ -27,6 +27,24 @@ public class WorkflowProviderConfiguration {
 		this.createWorkflow = createWorkflow;
 	}
 
+	@InterfaceFilter(implement = "be.nabu.eai.module.workflow.provider.WorkflowManager.mergeDefinition")
+	@XmlJavaTypeAdapter(value = ArtifactXMLAdapter.class)
+	public DefinedService getMergeDefinition() {
+		return mergeDefinition;
+	}
+	public void setMergeDefinition(DefinedService mergeDefinition) {
+		this.mergeDefinition = mergeDefinition;
+	}
+	
+	@InterfaceFilter(implement = "be.nabu.eai.module.workflow.provider.WorkflowManager.getDefinition")
+	@XmlJavaTypeAdapter(value = ArtifactXMLAdapter.class)
+	public DefinedService getGetDefinition() {
+		return getDefinition;
+	}
+	public void setGetDefinition(DefinedService getDefinition) {
+		this.getDefinition = getDefinition;
+	}
+	
 	@InterfaceFilter(implement = "be.nabu.eai.module.workflow.provider.WorkflowManager.updateWorkflow")
 	@XmlJavaTypeAdapter(value = ArtifactXMLAdapter.class)
 	@NotNull

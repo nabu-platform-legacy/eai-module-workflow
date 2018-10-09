@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -13,17 +14,16 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-import javafx.beans.binding.BooleanBinding;
 import javafx.beans.binding.DoubleBinding;
 import javafx.beans.binding.DoubleExpression;
 import javafx.beans.property.BooleanProperty;
-import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.ReadOnlyDoubleProperty;
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
+import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
 import javafx.scene.Node;
 import javafx.scene.Scene;
@@ -47,6 +47,7 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Shape;
 import be.nabu.eai.developer.MainController;
+import be.nabu.eai.developer.MainController.PropertyUpdater;
 import be.nabu.eai.developer.controllers.VMServiceController;
 import be.nabu.eai.developer.managers.base.BaseArtifactGUIInstance;
 import be.nabu.eai.developer.managers.base.BaseJAXBGUIManager;
@@ -58,6 +59,7 @@ import be.nabu.eai.developer.util.Confirm;
 import be.nabu.eai.developer.util.Confirm.ConfirmType;
 import be.nabu.eai.developer.util.EAIDeveloperUtils;
 import be.nabu.eai.developer.util.EAIDeveloperUtils.PropertyUpdaterListener;
+import be.nabu.eai.module.services.vm.RepositoryExecutorProvider;
 import be.nabu.eai.module.services.vm.VMServiceGUIManager;
 import be.nabu.eai.module.types.structure.StructureGUIManager;
 import be.nabu.eai.module.workflow.gui.RectangleWithHooks;
@@ -71,12 +73,14 @@ import be.nabu.jfx.control.line.Line;
 import be.nabu.jfx.control.tree.TreeItem;
 import be.nabu.jfx.control.tree.drag.MouseLocation;
 import be.nabu.jfx.control.tree.drag.TreeDragDrop;
+import be.nabu.libs.converter.ConverterFactory;
 import be.nabu.libs.property.api.Property;
 import be.nabu.libs.property.api.Value;
 import be.nabu.libs.services.api.DefinedServiceInterface;
 import be.nabu.libs.services.vm.Pipeline;
 import be.nabu.libs.services.vm.PipelineInterfaceProperty;
 import be.nabu.libs.services.vm.SimpleVMServiceDefinition;
+import be.nabu.libs.services.vm.api.ExecutorProvider;
 import be.nabu.libs.services.vm.api.Step;
 import be.nabu.libs.services.vm.api.VMService;
 import be.nabu.libs.services.vm.step.Sequence;
@@ -115,6 +119,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		split.setOrientation(Orientation.VERTICAL);
 		
 		drawPane = new AnchorPane();
+		drawPane.setPadding(new Insets(10, 10, 100, 100));
 		
 		for (WorkflowState state : artifact.getConfig().getStates()) {
 			drawState(artifact, state);
@@ -169,8 +174,11 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 								state.setName(name);
 								if (lastStateId != null) {
 									WorkflowState stateById = artifact.getStateById(lastStateId);
-									state.setX(stateById.getX() + 200);
-									state.setY(stateById.getY());
+									// may have been deleted already
+									if (stateById != null) {
+										state.setX(stateById.getX() + 200);
+										state.setY(stateById.getY());
+									}
 								}
 								artifact.getConfig().getStates().add(state);
 								DefinedStructure value = new DefinedStructure();
@@ -832,11 +840,90 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 						}
 						return true;
 					}
-				}, "x", "y", "targetStateId", "id", "name");
+				}, "x", "y", "targetStateId", "id", "name", "target", "targetProperties");
 				createUpdater.setSourceId(workflow.getId());
 				MainController.getInstance().showProperties(createUpdater, right, true);
 			
 				split.getItems().addAll(leftScrollPane, right);
+				
+				if (transition.getQuery() != null && !transition.getQuery().trim().toLowerCase().equals("false")) {
+					ExecutorProvider executorProvider = new RepositoryExecutorProvider(workflow.getRepository());
+					AnchorPane additional = new AnchorPane();
+					EnumeratedSimpleProperty<String> targetProperty = new EnumeratedSimpleProperty<String>("target", String.class, false);
+					targetProperty.addAll(executorProvider.getTargets().toArray(new String[0]));
+					HashSet<Property<?>> hashSet = new HashSet<Property<?>>(Arrays.asList(targetProperty));
+					List<Property<?>> targetProperties = new ArrayList<Property<?>>();
+					if (transition.getTarget() != null) {
+						targetProperties.addAll(executorProvider.getTargetProperties(transition.getTarget()));
+						hashSet.addAll(targetProperties);
+					}
+					PropertyUpdater updater = new PropertyUpdater() {
+						@Override
+						public Set<Property<?>> getSupportedProperties() {
+							return hashSet;
+						}
+						@SuppressWarnings({ "unchecked", "rawtypes" })
+						@Override
+						public Value<?>[] getValues() {
+							List<Value<?>> list = new ArrayList<Value<?>>(Arrays.asList(new Value<?> [] { 
+								new ValueImpl<String>(targetProperty, transition.getTarget())
+							}));
+							java.util.Map<String, String> values = transition.getTargetProperties();
+							if (values != null) {
+								for (Property<?> property : targetProperties) {
+									Object value = values.get(property.getName());
+									if (value != null) {
+										if (!String.class.isAssignableFrom(property.getValueClass()) && !((String) value).startsWith("=")) {
+											value = ConverterFactory.getInstance().getConverter().convert(value, property.getValueClass());
+										}
+										list.add(new ValueImpl(property, value));
+									}
+								}
+							}
+							return list.toArray(new Value<?>[list.size()]);
+						}
+						@Override
+						public boolean canUpdate(Property<?> property) {
+							return true;
+						}
+						@Override
+						public List<ValidationMessage> updateProperty(Property<?> property, Object value) {
+							if (property.equals(targetProperty)) {
+								transition.setTarget(value == null ? null : value.toString());
+								hashSet.removeAll(targetProperties);
+								targetProperties.clear();
+								transition.setTargetProperties(null);
+								if (transition.getTarget() != null) {
+									targetProperties.addAll(executorProvider.getTargetProperties(transition.getTarget()));
+									hashSet.addAll(targetProperties);
+								}
+							}
+							else {
+								if (transition.getTargetProperties() == null) {
+									transition.setTargetProperties(new HashMap<String, String>());
+								}
+								if (value == null) {
+									transition.getTargetProperties().remove(property.getName());
+								}
+								else {
+									if (!String.class.isAssignableFrom(property.getValueClass()) && value != null && !(value instanceof String)) {
+										value = ConverterFactory.getInstance().getConverter().convert(value, String.class);
+									}
+									transition.getTargetProperties().put(property.getName(), (String) value);
+								}
+							}
+							MainController.getInstance().setChanged();
+							return null;
+						}
+						@Override
+						public boolean isMandatory(Property<?> property) {
+							return true;
+						}
+					};
+					MainController.getInstance().showProperties(updater, additional, true);
+					split.getItems().add(additional);
+				}
+				
 				mapPane.getChildren().clear();
 				mapPane.getChildren().add(split);
 				// add an editor for the transient state

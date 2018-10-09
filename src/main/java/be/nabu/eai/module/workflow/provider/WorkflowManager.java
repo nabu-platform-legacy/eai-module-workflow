@@ -9,6 +9,7 @@ import javax.validation.constraints.NotNull;
 
 import be.nabu.libs.types.api.KeyValuePair;
 import nabu.misc.workflow.types.WorkflowBatchInstance;
+import nabu.misc.workflow.types.WorkflowDefinition;
 import nabu.misc.workflow.types.WorkflowInstance;
 import nabu.misc.workflow.types.WorkflowInstance.Level;
 import nabu.misc.workflow.types.WorkflowInstanceProperty;
@@ -69,6 +70,13 @@ public interface WorkflowManager {
 	@WebResult(name = "batches")
 	public List<WorkflowBatchInstance> getBatches(@WebParam(name = "connectionId") String connectionId, @WebParam(name = "state") Level state, @WebParam(name = "offset") Integer offset, @WebParam(name = "limit") Integer limit);
 
+	// whenever a workflow is created, we need to make sure the definition exists in the database for historical purposes
+	// you can obviously ignore this if you don't care about versions
+	public void mergeDefinition(@WebParam(name = "definition") WorkflowDefinition definition);
+	// get the definition of a specific version (if no version specified: the latest)
+	@WebResult(name = "definition")
+	public WorkflowDefinition getDefinition(@NotNull @WebParam(name = "definitionId") String workflowId, @WebParam(name = "version") Long version);
+	
 	@WebResult(name = "amount")
 	public default Long getAmountOfWorkflows(
 		@WebParam(name = "connectionId") String connectionId, 

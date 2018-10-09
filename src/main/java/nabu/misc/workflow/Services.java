@@ -47,6 +47,38 @@ public class Services {
 	
 	private ExecutionContext executionContext;
 	
+	public void retry(@WebParam(name = "connectionId") String connectionId, @WebParam(name = "definitionId") String definitionId, @NotNull @WebParam(name = "workflowId") String workflowId) throws ServiceException {
+		WorkflowInstance instance = null;
+		Workflow workflow = null;
+		if (definitionId == null) {
+			if (connectionId == null) {
+				connectionId = Workflow.deduceConnectionId(workflow);
+			}
+			instance = Workflow.resolveInstance(connectionId, workflowId);
+			if (instance == null) {
+				throw new RuntimeException("Could not find workflow instance: " + workflowId);
+			}
+			workflow = Workflow.resolveDefinition(instance.getDefinitionId());
+			if (workflow == null) {
+				throw new RuntimeException("Could not find workflow: " + instance.getDefinitionId());
+			}
+		}
+		else {
+			workflow = (Workflow) ArtifactResolverFactory.getInstance().getResolver().resolve(definitionId);
+			if (workflow == null) {
+				throw new RuntimeException("Could not find workflow: " + definitionId);
+			}
+			if (connectionId == null) {
+				connectionId = workflow.getConfig().getConnection() == null ? null : workflow.getConfig().getConnection().getId();
+			}
+			// or we try to dynamically figure it out
+			if (connectionId == null) {
+				connectionId = Workflow.deduceConnectionId(workflow);
+			}
+		}
+		workflow.autoRetry(connectionId, instance, executionContext.getSecurityContext().getToken());
+	}
+	
 	@WebResult(name = "workflowId")
 	public String start(
 			@NotNull @WebParam(name = "definitionId") String definitionId, 
@@ -105,8 +137,7 @@ public class Services {
 	public void run(
 			@NotNull @WebParam(name = "definitionId") String definitionId, 
 			@NotNull @WebParam(name = "transitionId") String transitionId, 
-			@WebParam(name = "workflowId") String workflowId, 
-			@WebParam(name = "asynchronous") Boolean asynchronous) throws ServiceException {
+			@WebParam(name = "workflowId") String workflowId) throws ServiceException {
 		Workflow resolve = (Workflow) ArtifactResolverFactory.getInstance().getResolver().resolve(definitionId);
 		if (resolve == null) {
 			throw new IllegalArgumentException("Could not find a workflow with id: " + definitionId);
@@ -131,7 +162,6 @@ public class Services {
 		
 		ComplexContent input = service.getServiceInterface().getInputDefinition().newInstance();
 		input.set("workflowId", workflowId);
-		input.set("asynchronous", asynchronous);
 		
 		runtime.run(input);
 	}
@@ -516,20 +546,7 @@ public class Services {
 		List<WorkflowDefinition> definitions = new ArrayList<WorkflowDefinition>();
 		if (artifacts != null) {
 			for (Workflow artifact : artifacts) {
-				WorkflowDefinition definition = new WorkflowDefinition();
-				definition.setDefinitionId(artifact.getId());
-				definition.setConnectionId(artifact.getConfig().getConnection() == null ? null : artifact.getConfig().getConnection().getId());
-				definition.setProviderId(artifact.getConfig().getProvider() == null ? null : artifact.getConfig().getProvider().getId());
-				
-				List<KeyValuePair> properties = new ArrayList<KeyValuePair>();
-				ComplexType propertyDefinition = artifact.getPropertyDefinition();
-				for (Element<?> element : TypeUtils.getAllChildren(propertyDefinition)) {
-					if (element.getType() instanceof SimpleType) {
-						properties.add(new KeyValuePairImpl(element.getName(), ((SimpleType<?>) element.getType()).getInstanceClass().getName()));
-					}
-				}
-				definition.setProperties(properties);
-				definition.setStates(artifact.getConfig().getStates());
+				WorkflowDefinition definition = buildDefinition(artifact);
 				definitions.add(definition);
 			}
 		}
@@ -540,5 +557,24 @@ public class Services {
 			}
 		});
 		return definitions;
+	}
+
+	public static WorkflowDefinition buildDefinition(Workflow artifact) {
+		WorkflowDefinition definition = new WorkflowDefinition();
+		definition.setDefinitionId(artifact.getId());
+		definition.setVersion(artifact.getVersion());
+		definition.setConnectionId(artifact.getConfig().getConnection() == null ? null : artifact.getConfig().getConnection().getId());
+		definition.setProviderId(artifact.getConfig().getProvider() == null ? null : artifact.getConfig().getProvider().getId());
+		
+		List<KeyValuePair> properties = new ArrayList<KeyValuePair>();
+		ComplexType propertyDefinition = artifact.getPropertyDefinition();
+		for (Element<?> element : TypeUtils.getAllChildren(propertyDefinition)) {
+			if (element.getType() instanceof SimpleType) {
+				properties.add(new KeyValuePairImpl(element.getName(), ((SimpleType<?>) element.getType()).getInstanceClass().getName()));
+			}
+		}
+		definition.setProperties(properties);
+		definition.setStates(artifact.getConfig().getStates());
+		return definition;
 	}
 }

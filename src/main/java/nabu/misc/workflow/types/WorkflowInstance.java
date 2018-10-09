@@ -8,13 +8,15 @@ import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.XmlType;
 
 @XmlRootElement
-@XmlType(propOrder = { "id", "definitionId", "parentId", "batchId", "contextId", "groupId", "correlationId", "workflowType", "uri", "started", "stopped", "environment", "transitionState", "stateId" })
+@XmlType(propOrder = { "id", "definitionId", "version", "parentId", "batchId", "contextId", "groupId", "correlationId", "workflowType", "uri", "started", "stopped", "environment", "transitionState", "stateId" })
 public class WorkflowInstance {
 	private String id, parentId, definitionId;
 	private Date started, stopped;
 	private String stateId, batchId, contextId, groupId, correlationId, environment, workflowType;
 	private Level transitionState;
 	private URI uri;
+	// the version of the workflow you are running
+	private Long version;
 	
 	@NotNull
 	public String getId() {
@@ -132,6 +134,16 @@ public class WorkflowInstance {
 		// the admin concluded that it will remain failed, this is a final state
 		FAILED,
 		// used for reverting on crash (non-final)
-		REVERTED
+		REVERTED,
+		// it is no longer relevant, execution has been stopped
+		CANCELLED
 	}
+
+	public Long getVersion() {
+		return version;
+	}
+	public void setVersion(Long version) {
+		this.version = version;
+	}
+	
 }

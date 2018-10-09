@@ -1,8 +1,13 @@
 package be.nabu.eai.module.workflow;
 
 import java.util.List;
+import java.util.Map;
+
+import javax.xml.bind.annotation.XmlTransient;
+import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 
 import be.nabu.eai.api.Hidden;
+import be.nabu.libs.services.vm.step.Invoke.KeyValueMapAdapter;
 
 // can not directly refer to target state as this may result in circular references!!
 // must refer to the id of the target state, separate resolving
@@ -25,6 +30,10 @@ public class WorkflowTransition implements Comparable<WorkflowTransition> {
 	private double x, y;
 	// the operation id for this transition
 	private String operationId;
+	
+	private String target;
+	
+	private Map<String, String> targetProperties;
 	
 	public String getId() {
 		return id;
@@ -97,6 +106,7 @@ public class WorkflowTransition implements Comparable<WorkflowTransition> {
 
 	// should not be persisted but...in a hurry! @hackathon gsk 2018-01-18
 	@Hidden
+	@XmlTransient
 	public String getOperationId() {
 		return operationId;
 	}
@@ -104,5 +114,18 @@ public class WorkflowTransition implements Comparable<WorkflowTransition> {
 		this.operationId = operationId;
 	}
 	
+	public String getTarget() {
+		return target;
+	}
+	public void setTarget(String target) {
+		this.target = target;
+	}
+	@XmlJavaTypeAdapter(value = KeyValueMapAdapter.class)
+	public Map<String, String> getTargetProperties() {
+		return targetProperties;
+	}
+	public void setTargetProperties(Map<String, String> targetProperties) {
+		this.targetProperties = targetProperties;
+	}
 	
 }

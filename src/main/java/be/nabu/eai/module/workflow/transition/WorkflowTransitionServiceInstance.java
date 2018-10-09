@@ -6,14 +6,15 @@ import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 
+import nabu.misc.workflow.Services;
+import nabu.misc.workflow.types.WorkflowInstance;
+import nabu.misc.workflow.types.WorkflowInstance.Level;
+import nabu.misc.workflow.types.WorkflowInstanceProperty;
+import nabu.misc.workflow.types.WorkflowTransitionInstance;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import nabu.misc.workflow.types.WorkflowInstance;
-import nabu.misc.workflow.types.WorkflowInstanceProperty;
-import nabu.misc.workflow.types.WorkflowTransitionInstance;
-import nabu.misc.workflow.types.WorkflowInstance.Level;
-import be.nabu.eai.module.services.jdbc.RepositoryDataSourceResolver;
 import be.nabu.eai.module.workflow.Workflow;
 import be.nabu.eai.module.workflow.Workflow.TransactionableAction;
 import be.nabu.eai.module.workflow.WorkflowState;
@@ -48,7 +49,7 @@ public class WorkflowTransitionServiceInstance implements ServiceInstance {
 		}
 		// or we try to dynamically figure it out
 		if (connectionId == null) {
-			connectionId = new RepositoryDataSourceResolver().getDataSourceId(service.getWorkflow().getId());
+			connectionId = Workflow.deduceConnectionId(service.getWorkflow());
 		}
 		return connectionId;
 	}
@@ -66,6 +67,7 @@ public class WorkflowTransitionServiceInstance implements ServiceInstance {
 		if (service.isInitial()) {
 			instance = new WorkflowInstance();
 			instance.setId(UUID.randomUUID().toString().replace("-", ""));
+			instance.setVersion(service.getWorkflow().getVersion());
 			if (input != null) {
 				instance.setParentId((String) input.get("parentId"));
 				instance.setCorrelationId((String) input.get("correlationId"));
@@ -81,10 +83,17 @@ public class WorkflowTransitionServiceInstance implements ServiceInstance {
 			instance.setStateId(service.getFromState().getId());
 			instance.setTransitionState(Level.RUNNING);
 			
+			// when creating a workflow and we are interested in versioning, make sure the version is persisted somewhere
+			if (service.getWorkflow().getConfig().isVersion() && service.getWorkflow().getConfig().getProvider().getConfig().getMergeDefinition() != null) {
+				service.getWorkflow().getConfig().getProvider().getWorkflowManager()
+					.mergeDefinition(Services.buildDefinition(service.getWorkflow()));
+			}
+			
 			Workflow.runTransactionally(new TransactionableAction<Void>() {
 				@Override
 				public Void call(String transactionId) throws Exception {
-					service.getWorkflow().getConfig().getProvider().getWorkflowManager().createWorkflow(connectionId, transactionId, instance);
+					service.getWorkflow().getConfig().getProvider().getWorkflowManager()
+						.createWorkflow(connectionId, transactionId, instance);
 					return null;
 				}
 			});
@@ -112,7 +121,15 @@ public class WorkflowTransitionServiceInstance implements ServiceInstance {
 					}
 				}
 				if (!isExtension) {
-					throw new ServiceException("WORKFLOW-0", "Workflow " + workflowId + " is not in the correct state to trigger this transition");
+					Boolean force = (Boolean) input.get("force");
+					if (force == null || !force) {
+						Boolean bestEffort = (Boolean) input.get("bestEffort");
+						if (bestEffort != null && bestEffort) {
+							logger.warn("Skipped best effort transition: " + service.getId());
+							return null;
+						}
+						throw new ServiceException("WORKFLOW-0", "Workflow " + workflowId + " is not in the correct state to trigger this transition");
+					}
 				}
 			}
 			

@@ -15,9 +15,10 @@ import be.nabu.libs.artifacts.api.DataSourceProviderArtifact;
 import be.nabu.libs.services.api.DefinedService;
 
 @XmlRootElement(name = "workflow")
-@XmlType(propOrder = { "connection", "provider", "states", "permissionService", "roleService", "tokenValidatorService", "transitionListeners" })
+@XmlType(propOrder = { "connection", "provider", "version", "states", "permissionService", "roleService", "tokenValidatorService", "transitionListeners" })
 public class WorkflowConfiguration {
 	
+	private boolean version;
 	private DataSourceProviderArtifact connection;
 	private WorkflowProvider provider;
 	private List<WorkflowState> states;
@@ -87,6 +88,13 @@ public class WorkflowConfiguration {
 	}
 	public void setTransitionListeners(List<DefinedService> transitionListeners) {
 		this.transitionListeners = transitionListeners;
+	}
+	
+	public boolean isVersion() {
+		return version;
+	}
+	public void setVersion(boolean version) {
+		this.version = version;
 	}
 	
 	

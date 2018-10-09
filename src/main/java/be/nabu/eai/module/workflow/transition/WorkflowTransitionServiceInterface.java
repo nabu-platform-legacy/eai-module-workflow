@@ -10,6 +10,7 @@ import be.nabu.eai.repository.api.Repository;
 import be.nabu.libs.services.api.DefinedServiceInterface;
 import be.nabu.libs.services.api.ServiceInterface;
 import be.nabu.libs.types.SimpleTypeWrapperFactory;
+import be.nabu.libs.types.TypeUtils;
 import be.nabu.libs.types.api.ComplexType;
 import be.nabu.libs.types.base.ComplexElementImpl;
 import be.nabu.libs.types.base.SimpleElementImpl;
@@ -30,7 +31,7 @@ public class WorkflowTransitionServiceInterface implements DefinedServiceInterfa
 			this.workflow = workflow;
 			this.fromState = fromState;
 			this.transition = transition;
-			this.isInitial = workflow.getInitialStates().contains(fromState);
+			this.isInitial = workflow.getInitialStates().contains(fromState) && !workflow.isExtensionState(fromState.getId()) && !workflow.isExtensionState(fromState.getName());
 		}
 		
 		private Structure input, output;
@@ -44,6 +45,8 @@ public class WorkflowTransitionServiceInterface implements DefinedServiceInterfa
 						input.add(new SimpleElementImpl<String>("connectionId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
 						if (!isInitial) {
 							input.add(new SimpleElementImpl<String>("workflowId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input));
+							input.add(new SimpleElementImpl<Boolean>("force", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(Boolean.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "If the workflow is not in the correct state, do you still want to trigger this transition? This is especially interesting for forcing a retry at a specific state.")));
+							input.add(new SimpleElementImpl<Boolean>("bestEffort", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(Boolean.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "If the workflow is not in the correct state, do you want an exception or just leave it? This is especially interesting for timed transitions that are used as a fallback.")));
 						}
 						else {
 							input.add(new SimpleElementImpl<String>("parentId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "The id of the parent workflow")));
@@ -54,8 +57,14 @@ public class WorkflowTransitionServiceInterface implements DefinedServiceInterfa
 							input.add(new SimpleElementImpl<String>("workflowType", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "The contextually relevant type of this workflow instance, for example a message type")));
 							input.add(new SimpleElementImpl<URI>("uri", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(URI.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "A lot of workflows revolve around data, if this is the case, log the uri for the relevant data here")));
 						}
-						input.add(new ComplexElementImpl("state", (ComplexType) getRepository().resolve(workflow.getId() + ".types.states." + EAIRepositoryUtils.stringToField(fromState.getName())), input));
-						input.add(new ComplexElementImpl("transition", (ComplexType) getRepository().resolve(workflow.getId() + ".types.transitions." + EAIRepositoryUtils.stringToField(transition.getName())), input));
+						ComplexType stateType = (ComplexType) getRepository().resolve(workflow.getId() + ".types.states." + EAIRepositoryUtils.stringToField(fromState.getName()));
+						if (stateType != null && !TypeUtils.getAllChildren(stateType).isEmpty()) {
+							input.add(new ComplexElementImpl("state", (ComplexType) stateType, input));
+						}
+						ComplexType transitionType = (ComplexType) getRepository().resolve(workflow.getId() + ".types.transitions." + EAIRepositoryUtils.stringToField(transition.getName()));
+						if (transitionType != null && !TypeUtils.getAllChildren(transitionType).isEmpty()) {
+							input.add(new ComplexElementImpl("transition", transitionType, input));
+						}
 //						input.add(new SimpleElementImpl<Boolean>("asynchronous", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(Boolean.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "Whether or not the execution should be done asynchronously")));
 						this.input = input;
 					}

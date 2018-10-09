@@ -12,6 +12,7 @@ import be.nabu.libs.types.api.KeyValuePair;
 @XmlType(propOrder = { "definitionId", "connectionId", "providerId", "properties", "states" })
 public class WorkflowDefinition {
 	private String definitionId, connectionId, providerId;
+	private Long version;
 	private List<WorkflowState> states;
 	private List<KeyValuePair> properties;
 	public String getDefinitionId() {
@@ -44,5 +45,10 @@ public class WorkflowDefinition {
 	public void setProperties(List<KeyValuePair> properties) {
 		this.properties = properties;
 	}
-	
+	public Long getVersion() {
+		return version;
+	}
+	public void setVersion(Long version) {
+		this.version = version;
+	}
 }

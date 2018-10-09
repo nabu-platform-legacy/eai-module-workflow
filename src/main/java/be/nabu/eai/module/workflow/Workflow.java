@@ -5,6 +5,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.URI;
 import java.nio.charset.Charset;
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -25,6 +26,8 @@ import nabu.misc.workflow.types.WorkflowTransitionInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import be.nabu.eai.module.services.jdbc.RepositoryDataSourceResolver;
+import be.nabu.eai.module.services.vm.RepositoryExecutorProvider;
 import be.nabu.eai.module.web.application.WebApplication;
 import be.nabu.eai.module.web.application.WebFragment;
 import be.nabu.eai.module.web.application.api.RESTFragment;
@@ -34,7 +37,9 @@ import be.nabu.eai.module.workflow.provider.WorkflowManager;
 import be.nabu.eai.module.workflow.provider.WorkflowProvider;
 import be.nabu.eai.module.workflow.transition.WorkflowTransitionService;
 import be.nabu.eai.repository.EAIRepositoryUtils;
+import be.nabu.eai.repository.EAIResourceRepository;
 import be.nabu.eai.repository.Notification;
+import be.nabu.eai.repository.api.Node;
 import be.nabu.eai.repository.api.Repository;
 import be.nabu.eai.repository.artifacts.jaxb.JAXBArtifact;
 import be.nabu.eai.repository.util.SystemPrincipal;
@@ -43,8 +48,11 @@ import be.nabu.libs.authentication.api.PermissionHandler;
 import be.nabu.libs.authentication.api.RoleHandler;
 import be.nabu.libs.authentication.api.Token;
 import be.nabu.libs.authentication.api.TokenValidator;
+import be.nabu.libs.evaluator.EvaluationException;
 import be.nabu.libs.evaluator.PathAnalyzer;
 import be.nabu.libs.evaluator.QueryParser;
+import be.nabu.libs.evaluator.api.Operation;
+import be.nabu.libs.evaluator.impl.VariableOperation;
 import be.nabu.libs.evaluator.types.api.TypeOperation;
 import be.nabu.libs.evaluator.types.operations.TypesOperationProvider;
 import be.nabu.libs.events.api.EventDispatcher;
@@ -58,7 +66,9 @@ import be.nabu.libs.services.ServiceRuntime;
 import be.nabu.libs.services.ServiceUtils;
 import be.nabu.libs.services.api.DefinedService;
 import be.nabu.libs.services.api.ServiceException;
+import be.nabu.libs.services.api.ServiceRunner;
 import be.nabu.libs.services.pojo.POJOUtils;
+import be.nabu.libs.services.vm.api.ExecutorProvider;
 import be.nabu.libs.services.vm.api.VMService;
 import be.nabu.libs.types.TypeUtils;
 import be.nabu.libs.types.api.ComplexContent;
@@ -67,6 +77,7 @@ import be.nabu.libs.types.api.Element;
 import be.nabu.libs.types.api.Type;
 import be.nabu.libs.types.base.ComplexElementImpl;
 import be.nabu.libs.types.base.TypeBaseUtils;
+import be.nabu.libs.types.mask.MaskedContent;
 import be.nabu.libs.types.properties.MinOccursProperty;
 import be.nabu.libs.types.structure.DefinedStructure;
 import be.nabu.libs.types.structure.Structure;
@@ -83,6 +94,10 @@ import be.nabu.libs.validator.api.ValidationMessage.Severity;
 
 // TODO: add security checks for transitions
 // TODO: can add a service runtime tracker that intercepts steps (and descriptions etc?) and builds a log file for each transition
+// if we find a workflow that is running in an old version, we need to "mount" that version
+// so basically get the old definition, add it (like the current workflow) to the repository but in a subfolder like "v3"
+// we can then access all the document types & transitions and run it (best effort)
+// if there are dependencies missing or modified to work differently, this can not be helped (but the same is true for classic BPMN)
 public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements WebFragment, RESTFragmentProvider {
 
 	private Logger logger = LoggerFactory.getLogger(getClass());
@@ -94,6 +109,23 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 	private Map<String, ComplexType> stateEvaluationStructures = new HashMap<String, ComplexType>();
 	
 	private Map<String, DefinedStructure> structures = new HashMap<String, DefinedStructure>();
+	
+	public static WorkflowInstance resolveInstance(String connectionId, String workflowId) {
+		WorkflowProvider defaultProvider = (WorkflowProvider) EAIResourceRepository.getInstance().resolve("nabu.misc.workflow.providers.basic.provider");
+		return defaultProvider.getWorkflowManager().getWorkflow(connectionId, workflowId);
+	}
+	
+	public static String deduceConnectionId(Workflow workflow) {
+		String serviceContext = ServiceUtils.getServiceContext(ServiceRuntime.getRuntime(), false);
+		if (serviceContext == null && workflow != null) {
+			serviceContext = workflow.getId();
+		}
+		return new RepositoryDataSourceResolver().getDataSourceId(serviceContext);
+	}
+	
+	public static Workflow resolveDefinition(String definitionId) {
+		return (Workflow) EAIResourceRepository.getInstance().resolve(definitionId);
+	}
 	
 	public Workflow(String id, ResourceContainer<?> directory, Repository repository) {
 		super(id, directory, repository, "workflow.xml", WorkflowConfiguration.class);
@@ -291,6 +323,61 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 		return null;
 	}
 	
+	// an autoretry finds the last transition that can be rerun without providing additional input and runs it
+	public void autoRetry(String connectionId, WorkflowInstance workflow, Token token) throws ServiceException {
+		List<WorkflowTransitionInstance> history = new ArrayList<WorkflowTransitionInstance>();
+		
+		List<WorkflowTransitionInstance> transitions = getConfig().getProvider().getWorkflowManager().getTransitions(connectionId, workflow.getId());
+		if (transitions != null) {
+			history.addAll(transitions);
+		}
+		
+		if (history.isEmpty()) {
+			throw new IllegalStateException("No transitions found to retry for: " + workflow.getId());
+		}
+		
+		Collections.sort(history);
+		// most recent to oldest
+		Collections.reverse(history);
+		
+		for (WorkflowTransitionInstance instance : history) {
+			// we want the service, the interface has all the information we need and if applicable, we need to run it
+			// note that we can not auto retry initial transitions, create a new workflow for that
+			WorkflowTransition transition = getTransitionById(instance.getDefinitionId());
+			// only relevant if the transition still exists
+			if (transition != null) {
+				String serviceId = getId() + ".services.transition" + "." + EAIRepositoryUtils.stringToField(transition.getName());
+				DefinedService transitionService = (DefinedService) getRepository().resolve(serviceId);
+				if (transitionService != null) {
+					ComplexType inputDefinition = transitionService.getServiceInterface().getInputDefinition();
+					// if there are no input parameters for this service, we can run it
+					if (inputDefinition.get("state") == null && inputDefinition.get("transition") == null) {
+						ComplexContent input = inputDefinition.newInstance();
+						input.set("workflowId", workflow.getId());
+						input.set("force", true);
+						ServiceRuntime runtime = new ServiceRuntime(transitionService, getRepository().newExecutionContext(token));
+						runtime.run(input);
+						break;
+					}
+					else {
+						logger.info("[Retry] Skipping transition because of required input: " + serviceId);
+					}
+				}
+				else {
+					logger.warn("[Retry] Could not find transition service: " + serviceId);
+				}
+			}
+		}
+	}
+	
+	public long getVersion() {
+		Node node = getRepository().getNode(getId());
+		if (node == null) {
+			throw new IllegalStateException("Could not find node");
+		}
+		return node.getVersion();
+	}
+	
 	public void run(String connectionId, WorkflowInstance workflow, List<WorkflowTransitionInstance> history, List<WorkflowInstanceProperty> properties, WorkflowTransition transition, Token token, ComplexContent input) throws ServiceException {
 		try {
 			// check if the current user is allowed to run it
@@ -409,7 +496,10 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 	
 			// now we run the transition service
 			ComplexContent mapInput = transitionService.getServiceInterface().getInputDefinition().newInstance();
-			mapInput.set("connectionId", connectionId);
+			// old workflows don't have a connection id in their input
+			if (mapInput.getType().get("connectionId") != null) {
+				mapInput.set("connectionId", connectionId);
+			}
 			mapInput.set("workflow", workflow);
 			mapInput.set("properties", propertiesToObject(properties));
 			mapInput.set("history", history);
@@ -652,12 +742,42 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 			}
 		}
 	}
+	
+	private Object getVariable(ComplexContent pipeline, String query) throws ServiceException {
+		VariableOperation.registerRoot();
+		try {
+			Operation<ComplexContent> analyze = new PathAnalyzer<ComplexContent>(new TypesOperationProvider()).analyze(QueryParser.getInstance().parse(query));
+			return analyze.evaluate(pipeline);
+		}
+		catch (EvaluationException e) {
+			throw new ServiceException(e);
+		}
+		catch (ParseException e) {
+			throw new ServiceException(e);
+		}
+		finally {
+			VariableOperation.unregisterRoot();
+		}
+	}
 
 	private void continueWorkflow(String connectionId, WorkflowInstance workflow, List<WorkflowTransitionInstance> history, List<WorkflowInstanceProperty> properties, Token token, WorkflowState targetState, ComplexContent output) {
 		ComplexContent content = getStateEvaluationType(targetState.getId()).newInstance();
 		content.set("properties", propertiesToObject(properties));
 		content.set("state", output == null ? null : output.get("state"));
 		List<WorkflowTransition> possibleTransitions = new ArrayList<WorkflowTransition>(targetState.getTransitions());
+		// we add the transitions of extended states, they can also autotrigger
+		if (targetState.getExtensions() != null) {
+			for (String name : targetState.getExtensions()) {
+				WorkflowState extended = getStateById(name);
+				if (extended.getTransitions() != null) {
+					for (WorkflowTransition transition : extended.getTransitions()) {
+						if (!possibleTransitions.contains(transition)) {
+							possibleTransitions.add(transition);
+						}
+					}
+				}
+			}
+		}
 		Collections.sort(possibleTransitions);
 		boolean foundNext = false;
 		for (WorkflowTransition possibleTransition : possibleTransitions) {
@@ -680,7 +800,40 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 				try {
 					if (value != null && value) {
 						foundNext = true;
-						run(connectionId, workflow, history, properties, possibleTransition, token, content);
+						// this allows us to easily build in asynchronous and/or timed executions
+						if (possibleTransition.getTarget() != null) {
+							String cleanName = EAIRepositoryUtils.stringToField(possibleTransition.getName());
+							String serviceId = getId() + ".services.transition." + cleanName;
+							DefinedService transitionService = (DefinedService) getRepository().resolve(serviceId);
+							if (transitionService == null) {
+								throw new IllegalStateException("Could not find transition service: " + serviceId);
+							}
+							MaskedContent masked = new MaskedContent(content, transitionService.getServiceInterface().getInputDefinition());
+							masked.set("bestEffort", "true");
+							masked.set("workflowId", workflow.getId());
+							masked.set("connectionId", connectionId);
+							
+							ExecutorProvider executor = new RepositoryExecutorProvider(getRepository());
+							Map<String, String> targetProperties = possibleTransition.getTargetProperties();
+							Map<String, Object> parameters = new HashMap<String, Object>();
+							if (targetProperties != null) {
+								for (Map.Entry<String, String> entry : targetProperties.entrySet()) {
+									if (entry.getValue() != null && entry.getValue().startsWith("=")) {
+										parameters.put(entry.getKey(), getVariable(masked, entry.getValue().substring(1)));
+									}
+									else {
+										parameters.put(entry.getKey(), entry.getValue());
+									}
+								}
+							}
+							ServiceRunner runner = executor.getRunner(possibleTransition.getTarget(), parameters);
+							
+							runner.run(transitionService, ServiceRuntime.getRuntime().getExecutionContext(), masked);
+						}
+						// this is more performant because we don't have to retrieve the history & properties again
+						else {
+							run(connectionId, workflow, history, properties, possibleTransition, token, content);
+						}
 					}
 				}
 				catch (Exception e) {
