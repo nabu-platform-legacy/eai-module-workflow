@@ -357,9 +357,6 @@ public class Services {
 		if (resolve == null) {
 			throw new IllegalArgumentException("Could not find a workflow with id: " + definitionId);
 		}
-		if (token != null && stateId != null && !getActionableStates(definitionId, token).contains(stateId)) {
-			throw new SecurityException("The user does not have access to workflows of type '" + definitionId + "' in state '" + stateId + "'");
-		}
 		WorkflowState workflowState = null;
 		if (stateId != null) {
 			for (WorkflowState potential : resolve.getConfig().getStates()) {
@@ -370,6 +367,9 @@ public class Services {
 			}
 			if (workflowState == null) {
 				throw new IllegalArgumentException("'" + stateId + "' is not a valid state for the workflow '" + definitionId + "'");
+			}
+			else if (token != null && getActionableStates(definitionId, token).contains(workflowState)) {
+				throw new SecurityException("The user does not have access to workflows of type '" + definitionId + "' in state '" + stateId + "'");
 			}
 		}
 		return resolve.getConfig().getProvider().getWorkflowManager().getWorkflows(

@@ -122,7 +122,7 @@ public class WorkflowRESTListener implements EventHandler<HTTPRequest, HTTPRespo
 					String contentType = MimeUtils.getContentType(request.getContent().getHeaders());
 					UnmarshallableBinding binding;
 					if (contentType == null) {
-						throw new HTTPException(400, "Unknown request content type");
+						throw new HTTPException(415, "Unknown request content type", token);
 					}
 					else if (contentType.equalsIgnoreCase("application/xml") || contentType.equalsIgnoreCase("text/xml")) {
 						binding = new XMLBinding(service.getServiceInterface().getInputDefinition(), charset);
@@ -135,7 +135,7 @@ public class WorkflowRESTListener implements EventHandler<HTTPRequest, HTTPRespo
 					}
 					// no binding provider support for now because it is in the rest library
 					else {
-						throw new HTTPException(400, "Unsupported content type: " + contentType);
+						throw new HTTPException(415, "Unsupported content type: " + contentType, token);
 					}
 					input = binding.unmarshal(IOUtils.toInputStream(readable), new Window[0]);
 				}
@@ -189,7 +189,7 @@ public class WorkflowRESTListener implements EventHandler<HTTPRequest, HTTPRespo
 				binding = new FormBinding(output.getType(), charset);
 			}
 			else {
-				throw new HTTPException(400, "Unsupported response content type: " + contentType);
+				throw new HTTPException(400, "Unsupported response content type: " + contentType, token);
 			}
 			
 			ByteArrayOutputStream content = new ByteArrayOutputStream();

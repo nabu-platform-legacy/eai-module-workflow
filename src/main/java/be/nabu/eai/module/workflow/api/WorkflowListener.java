@@ -10,6 +10,7 @@ import nabu.misc.workflow.types.WorkflowInstance;
 
 public interface WorkflowListener {
 	public void transition(
+		@WebParam(name = "connectionId") String connectionId,	
 		@WebParam(name = "workflow") @NotNull WorkflowInstance workflow, 
 		@WebParam(name = "transition") @NotNull WorkflowTransition transition,
 		@WebParam(name = "fromState") WorkflowState fromState,

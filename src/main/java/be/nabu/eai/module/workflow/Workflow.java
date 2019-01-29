@@ -206,7 +206,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 					}
 					catch (Exception e) {
 						logger.error("Could not revert workflow " + workflow.getId(), e);
-						fire("revert", 0, workflow.getId(), "Could not revert running workflow", Notification.format(e), Severity.WARNING);
+						fire("revert", 0, workflow.getId(), "Could not revert running workflow", Notification.format(e), Severity.WARNING, null);
 					}
 				}
 			}
@@ -229,7 +229,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 							}
 							catch (Exception e) {
 								logger.error("Could not revert workflow batch " + batch.getId(), e);
-								fire("batchRevert", 1, batch.getId(), "Could not revert running workflow batch", Notification.format(e), Severity.WARNING);
+								fire("batchRevert", 1, batch.getId(), "Could not revert running workflow batch", Notification.format(e), Severity.WARNING, null);
 							}
 						}
 					}
@@ -238,9 +238,13 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 		}
 	}
 	
-	private void fire(String type, int code, String id, String message, String description, Severity severity) {
+	private void fire(String type, int code, String id, String message, String description, Severity severity, Token token) {
 		try {
 			Notification notification = new Notification();
+			if (token != null) {
+				notification.setAlias(token.getName());
+				notification.setRealm(token.getRealm());
+			}
 			notification.setContext(Arrays.asList(id, getId()));
 			notification.setCode(0);
 			notification.setType("nabu.misc.workflow." + type);
@@ -353,6 +357,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 					// if there are no input parameters for this service, we can run it
 					if (inputDefinition.get("state") == null && inputDefinition.get("transition") == null) {
 						ComplexContent input = inputDefinition.newInstance();
+						input.set("connectionId", connectionId);
 						input.set("workflowId", workflow.getId());
 						input.set("force", true);
 						ServiceRuntime runtime = new ServiceRuntime(transitionService, getRepository().newExecutionContext(token));
@@ -624,7 +629,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 					}
 				});
 				
-				callListeners(workflow, transition, sourceState, targetState, token);
+				callListeners(connectionId, workflow, transition, sourceState, targetState, token);
 				
 				// check if the batch is already done, if so we can continue
 				if (batch != null) {
@@ -716,7 +721,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 			}
 		}
 		catch (Exception e) {
-			fire("run", 2, workflow.getId(), "Failed while running transition '" + transition.getName() + "' (or automatic transitions after it)", Notification.format(e), Severity.ERROR);
+			fire("run", 2, workflow.getId(), "Failed while running transition '" + transition.getName() + "' (or automatic transitions after it)", Notification.format(e), Severity.ERROR, token);
 			if (e instanceof ServiceException) {
 				throw (ServiceException) e;
 			}
@@ -729,15 +734,15 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 		}
 	}
 
-	public void callListeners(WorkflowInstance workflow, WorkflowTransition transition, WorkflowState fromState, WorkflowState toState, Token token) {
+	public void callListeners(String connectionId, WorkflowInstance workflow, WorkflowTransition transition, WorkflowState fromState, WorkflowState toState, Token token) {
 		if (getConfig().getTransitionListeners() != null) {
 			for (DefinedService service : getConfig().getTransitionListeners()) {
 				WorkflowListener listener = POJOUtils.newProxy(WorkflowListener.class, service, getRepository(), SystemPrincipal.ROOT);
 				try {
-					listener.transition(workflow, transition, fromState, toState, token);
+					listener.transition(connectionId, workflow, transition, fromState, toState, token);
 				}
 				catch (Exception e) {
-					fire("listener", 2, workflow.getId(), "Could not execute workflow listener", Notification.format(e), Severity.ERROR);
+					fire("listener", 2, workflow.getId(), "Could not execute workflow listener", Notification.format(e), Severity.ERROR, token);
 				}
 			}
 		}
@@ -780,7 +785,12 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 		}
 		Collections.sort(possibleTransitions);
 		boolean foundNext = false;
+		int queryOrderMatch = -1;
 		for (WorkflowTransition possibleTransition : possibleTransitions) {
+			// if we already have a matching query order and the current order is higher, we will not be running any more transitions
+			if (queryOrderMatch >= 0 && possibleTransition.getQueryOrder() > queryOrderMatch) {
+				break;
+			}
 			if (canAutomaticallyTransition(possibleTransition)) {
 				String query = possibleTransition.getQuery();
 				Boolean value = null;
@@ -799,6 +809,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 				}
 				try {
 					if (value != null && value) {
+						queryOrderMatch = possibleTransition.getQueryOrder();
 						foundNext = true;
 						// this allows us to easily build in asynchronous and/or timed executions
 						if (possibleTransition.getTarget() != null) {
@@ -839,13 +850,6 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 				catch (Exception e) {
 					logger.error("Could not automatically transition to " + possibleTransition.getName(), e);
 				}
-				finally {
-					// stop running, also in case of error
-					// otherwise other matching transitions might occur
-					if (foundNext) {
-						break;
-					}
-				}
 			}
 		}
 		// update the workflow to WAITING
@@ -855,7 +859,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 				@Override
 				public Void call(String transactionId) throws Exception {
 					WorkflowManager workflowManager = getConfig().getProvider().getWorkflowManager();
-					workflowManager.updateWorkflow(getConfig().getConnection() == null ? null : getConfig().getConnection().getId(), transactionId, workflow);
+					workflowManager.updateWorkflow(connectionId, transactionId, workflow);
 					return null;
 				}
 			});

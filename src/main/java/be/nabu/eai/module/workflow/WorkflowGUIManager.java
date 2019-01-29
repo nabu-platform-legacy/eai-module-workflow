@@ -106,6 +106,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 	}
 	
 	private Map<String, RectangleWithHooks> states = new HashMap<String, RectangleWithHooks>();
+	private Map<String, List<Node>> extensions = new HashMap<String, List<Node>>();
 	private Map<String, List<Node>> transitions = new HashMap<String, List<Node>>();
 	private AnchorPane drawPane;
 	private Line draggingLine;
@@ -121,10 +122,30 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		drawPane = new AnchorPane();
 		drawPane.setPadding(new Insets(10, 10, 100, 100));
 		
+		// draw the states
 		for (WorkflowState state : artifact.getConfig().getStates()) {
 			drawState(artifact, state);
 		}
-		
+		// draw extensions
+		for (WorkflowState state : artifact.getConfig().getStates()) {
+			if (state.getExtensions() != null) {
+				Iterator<String> iterator = state.getExtensions().iterator();
+				while (iterator.hasNext()) {
+					String id = iterator.next();
+					WorkflowState parent = artifact.getStateById(id);
+					if (parent != null) {
+						// draw possible extensions
+						drawExtension(artifact, state, parent);
+					}
+					// can no longer find extended parent, remove the extension
+					else {
+						iterator.remove();
+						MainController.getInstance().setChanged();
+					}
+				}
+			}
+		}
+			
 		for (WorkflowState state : artifact.getConfig().getStates()) {
 			Iterator<WorkflowTransition> iterator = state.getTransitions().iterator();
 			while (iterator.hasNext()) {
@@ -321,7 +342,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 				}
 				
 				// TODO: extensions should really be enumerated and should persist ids instead of names...
-				SimplePropertyUpdater createUpdater = EAIDeveloperUtils.createUpdater(state, null, "x", "y", "transitions.*", "id", "name");
+				SimplePropertyUpdater createUpdater = EAIDeveloperUtils.createUpdater(state, null, "x", "y", "transitions.*", "id", "name", "extensions");
 				createUpdater.setSourceId(workflow.getId());
 				MainController.getInstance().showProperties(createUpdater, right, true);
 			
@@ -386,7 +407,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		rectangle.getContent().addEventHandler(MouseEvent.DRAG_DETECTED, new EventHandler<MouseEvent>() {
 			@Override
 			public void handle(MouseEvent event) {
-				if (event.isControlDown() && locked.get()) {
+				if ((event.isControlDown() || event.isShiftDown()) && locked.get()) {
 					draggingLine = new Line();
 					draggingLine.startXProperty().bind(rectangle.rightAnchorXProperty());
 					draggingLine.startYProperty().bind(rectangle.rightAnchorYProperty());
@@ -394,7 +415,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 					draggingLine.endYProperty().bind(MouseLocation.getInstance(scene).yProperty().subtract(drawPane.localToSceneTransformProperty().get().getTy()));
 					Dragboard dragboard = rectangle.getContainer().startDragAndDrop(TransferMode.LINK);
 					Map<DataFormat, Object> content = new HashMap<DataFormat, Object>();
-					content.put(TreeDragDrop.getDataFormat("connect"), state.getId());
+					content.put(TreeDragDrop.getDataFormat(event.isControlDown() ? "connect" : "extend"), state.getId());
 					dragboard.setContent(content);
 					event.consume();
 					drawPane.getChildren().add(draggingLine);
@@ -408,6 +429,30 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 				if (content != null && !workflow.isExtensionState(state.getId()) && !workflow.isExtensionState(state.getName())) {
 					event.acceptTransferModes(TransferMode.ANY);
 					event.consume();
+				}
+				else {
+					content = event.getDragboard().getContent(TreeDragDrop.getDataFormat("extend"));
+					if (content != null) {
+						boolean isAllowed = true;
+						// there should not be any transitions _to_ the state you are about to extend
+						for (WorkflowState state : workflow.getConfig().getStates()) {
+							if (state.getTransitions() != null) {
+								for (WorkflowTransition transition : state.getTransitions()) {
+									if (transition.getTargetStateId().equals(state.getId())) {
+										isAllowed = false;
+										break;
+									}
+								}
+							}
+							if (!isAllowed) {
+								break;
+							}
+						}
+						if (isAllowed) {
+							event.acceptTransferModes(TransferMode.ANY);
+							event.consume();
+						}
+					}
 				}
 			}
 		});
@@ -511,6 +556,22 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 					}
 					event.setDropCompleted(true);
 					event.consume();
+				}
+				else {
+					Object extendContent = event.getDragboard().getContent(TreeDragDrop.getDataFormat("extend"));
+					if (extendContent != null) {
+						WorkflowState stateById = workflow.getStateById(extendContent.toString());
+						if (stateById != null) {
+							if (stateById.getExtensions() == null) {
+								stateById.setExtensions(new ArrayList<String>());
+							}
+							if (!stateById.getExtensions().contains(state.getId())) {
+								stateById.getExtensions().add(state.getId());
+								drawExtension(workflow, stateById, state);
+								MainController.getInstance().setChanged();
+							}
+						}
+					}
 				}
 			}
 		});
@@ -662,6 +723,69 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		workflow.getStructures().remove(transition.getId());
 		workflow.getMappings().remove(transition.getId());
 		MainController.getInstance().setChanged();
+	}
+	
+	private void removeExtension(final Workflow workflow, final WorkflowState child, final WorkflowState parent) {
+		List<Node> list1 = extensions.get(child.getId());
+		List<Node> list2 = extensions.get(parent.getId());
+		if (list1 != null && list2 != null) {
+			Iterator<Node> iterator = list1.iterator();
+			while (iterator.hasNext()) {
+				Node node = iterator.next();
+				if (list2.contains(node)) {
+					drawPane.getChildren().remove(node);
+					list2.remove(node);
+					iterator.remove();
+					child.getExtensions().remove(parent.getId());
+					MainController.getInstance().setChanged();
+				}
+			}
+		}
+	}
+	private void drawExtension(final Workflow workflow, final WorkflowState child, final WorkflowState parent) {
+		Line line = new Line();
+		line.eventSizeProperty().set(5);
+		
+		EndpointPicker picker = getPicker(line.endXProperty(), line.endYProperty(), states.get(child.getId()));
+		line.startXProperty().bind(picker.xProperty());
+		line.startYProperty().bind(picker.yProperty());
+		
+		EndpointPicker picker2 = getPicker(line.startXProperty(), line.startYProperty(), states.get(parent.getId()));
+		line.endXProperty().bind(picker2.xProperty());
+		line.endYProperty().bind(picker2.yProperty());
+		
+		line.getStyleClass().add("extensionLine");
+		
+		line.addEventHandler(MouseEvent.MOUSE_CLICKED, new EventHandler<MouseEvent>() {
+			@Override
+			public void handle(MouseEvent arg0) {
+				line.requestFocus();
+			}
+		});
+		BooleanProperty locked = MainController.getInstance().hasLock(workflow.getId());
+		line.addEventHandler(KeyEvent.KEY_PRESSED, new EventHandler<KeyEvent>() {
+			@Override
+			public void handle(KeyEvent event) {
+				if (event.getCode() == KeyCode.DELETE && locked.get()) {
+					Confirm.confirm(ConfirmType.QUESTION, "Delete extension?", "Are you sure you want to delete the extension?", new EventHandler<ActionEvent>() {
+						@Override
+						public void handle(ActionEvent arg0) {
+							removeExtension(workflow, child, parent);
+						}
+					});
+				}
+			}
+		});
+		
+		if (!extensions.containsKey(child)) {
+			extensions.put(child.getId(), new ArrayList<Node>());
+		}
+		if (!extensions.containsKey(parent)) {
+			extensions.put(parent.getId(), new ArrayList<Node>());
+		}
+		extensions.get(child.getId()).add(line);
+		extensions.get(parent.getId()).add(line);
+		drawPane.getChildren().addAll(line);
 	}
 	
 	private void drawTransition(final Workflow workflow, final WorkflowState state, final WorkflowTransition transition) {

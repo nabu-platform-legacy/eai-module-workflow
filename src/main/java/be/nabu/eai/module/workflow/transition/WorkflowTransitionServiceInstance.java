@@ -66,9 +66,9 @@ public class WorkflowTransitionServiceInstance implements ServiceInstance {
 		final String connectionId = getConnectionId(input);
 		if (service.isInitial()) {
 			instance = new WorkflowInstance();
-			instance.setId(UUID.randomUUID().toString().replace("-", ""));
 			instance.setVersion(service.getWorkflow().getVersion());
 			if (input != null) {
+				instance.setId((String) input.get("workflowId"));
 				instance.setParentId((String) input.get("parentId"));
 				instance.setCorrelationId((String) input.get("correlationId"));
 				instance.setBatchId((String) input.get("batchId"));
@@ -76,6 +76,10 @@ public class WorkflowTransitionServiceInstance implements ServiceInstance {
 				instance.setContextId((String) input.get("contextId"));
 				instance.setWorkflowType((String) input.get("workflowType"));
 				instance.setUri((URI) input.get("uri"));
+			}
+			// generate an id if none was passed in
+			if (instance.getId() == null) {
+				instance.setId(UUID.randomUUID().toString().replace("-", ""));
 			}
 			instance.setStarted(new Date());
 			instance.setDefinitionId(service.getWorkflow().getId());
