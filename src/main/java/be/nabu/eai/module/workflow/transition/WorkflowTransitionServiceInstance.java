@@ -3,7 +3,9 @@ package be.nabu.eai.module.workflow.transition;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import nabu.misc.workflow.Services;
@@ -112,18 +114,12 @@ public class WorkflowTransitionServiceInstance implements ServiceInstance {
 			instance = workflowManager.getWorkflow(connectionId, workflowId);
 			
 			if (!instance.getStateId().equals(service.getFromState().getId())) {
-				boolean isExtension = false;
 				// check if the "from state" is actually an extension
 				WorkflowState state = service.getWorkflow().getStateById(instance.getStateId());
-				if (state.getExtensions() != null) {
-					for (String extension : state.getExtensions()) {
-						WorkflowState extensionState = service.getWorkflow().getStateById(extension);
-						if (service.getFromState().getId().equals(extensionState.getId())) {
-							isExtension = true;
-							break;
-						}
-					}
-				}
+				
+				// check if the state is the same as the source state of this service or an extension
+				boolean isExtension = isExtension(state, new HashSet<WorkflowState>());
+				
 				if (!isExtension) {
 					Boolean force = (Boolean) input.get("force");
 					if (force == null || !force) {
@@ -175,5 +171,28 @@ public class WorkflowTransitionServiceInstance implements ServiceInstance {
 			output.set("workflowId", instance.getId());
 		}
 		return output;
+	}
+	
+	private boolean isExtension(WorkflowState currentState, Set<WorkflowState> checkedStates) {
+		// the same state, we good to go
+		if (currentState.getId().equals(service.getFromState().getId())) {
+			return true;
+		}
+		// we already checked this state and apparently concluded it was not in there
+		else if (checkedStates.contains(currentState)) {
+			return false;
+		}
+		// always add the current state to prevent circular lookups
+		checkedStates.add(currentState);
+		// the state extends other states, check those as well
+		if (currentState.getExtensions() != null) {
+			for (String stateId : currentState.getExtensions()) {
+				WorkflowState stateById = service.getWorkflow().getStateById(stateId);
+				if (isExtension(stateById, checkedStates)) {
+					return true;
+				}
+			}
+		}
+		return false;
 	}
 }
