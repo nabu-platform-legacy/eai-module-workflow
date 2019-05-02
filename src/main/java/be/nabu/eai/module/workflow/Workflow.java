@@ -82,6 +82,9 @@ import be.nabu.libs.types.properties.MinOccursProperty;
 import be.nabu.libs.types.structure.DefinedStructure;
 import be.nabu.libs.types.structure.Structure;
 import be.nabu.libs.validator.api.ValidationMessage.Severity;
+import be.nabu.utils.cep.api.EventSeverity;
+import be.nabu.utils.cep.impl.CEPUtils;
+import be.nabu.utils.cep.impl.ComplexEventImpl;
 
 // expose folders for each state with transition methods (input extends actual transition service input + workflow instance id)
 // only expose if state is manual? as in, no transition picker
@@ -246,7 +249,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 				notification.setRealm(token.getRealm());
 			}
 			notification.setContext(Arrays.asList(id, getId()));
-			notification.setCode(0);
+			notification.setCode("WORKFLOW-0");
 			notification.setType("nabu.misc.workflow." + type);
 			notification.setMessage(message);
 			notification.setDescription(description);
@@ -384,6 +387,22 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 	}
 	
 	public void run(String connectionId, WorkflowInstance workflow, List<WorkflowTransitionInstance> history, List<WorkflowInstanceProperty> properties, WorkflowTransition transition, Token token, ComplexContent input) throws ServiceException {
+		ComplexEventImpl event = null;
+		if (getRepository().getComplexEventDispatcher() != null) {
+			event = new ComplexEventImpl();
+			event.setEventName("workflow-transition");
+			event.setAction(transition.getName());
+			event.setCorrelationId(workflow.getId());
+			event.setArtifactId(workflow.getId());
+			event.setCreated(new Date());
+			event.setStarted(event.getCreated());
+			event.setSeverity(EventSeverity.INFO);
+			if (token != null) {
+				event.setAlias(token.getName());
+				event.setRealm(token.getRealm());
+			}
+		}
+		
 		try {
 			// check if the current user is allowed to run it
 			TokenValidator tokenValidator = getTokenValidator();
@@ -416,7 +435,10 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 			VMService transitionService = getMappings().get(transition.getId());
 			
 			if (transitionService == null) {
-				throw new ServiceException("WORKFLOW-2", "No transition service found for transition: " + transition.getName() + " (" + transition.getId() + ")");
+				ServiceException serviceException = new ServiceException("WORKFLOW-2", "No transition service found");
+				serviceException.setDescription("No transition service found for transition: " + transition.getName() + " (" + transition.getId() + ")");
+				serviceException.setToken(token);
+				throw serviceException;
 			}
 	
 			WorkflowManager workflowManager = getConfig().getProvider().getWorkflowManager();
@@ -649,6 +671,9 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 				}
 			}
 			catch (Exception e) {
+				if (event != null) {
+					CEPUtils.enrich(event, e);
+				}
 				newInstance.setTransitionState(Level.ERROR);
 				newInstance.setStopped(new Date());
 				StringWriter writer = new StringWriter();
@@ -661,6 +686,10 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 				while (current != null) {
 					if (current instanceof ServiceException) {
 						newInstance.setErrorCode(((ServiceException) current).getCode());
+						if (event != null) {
+							event.setCode(newInstance.getErrorCode());
+							event.setReason(((ServiceException) current).getDescription());
+						}
 						break;
 					}
 					current = current.getCause();
@@ -679,6 +708,10 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 			finally {
 				if (contextSet) {
 					ServiceUtils.setServiceContext(serviceRuntime, null);
+				}
+				if (event != null) {
+					event.setStopped(new Date());
+					getRepository().getComplexEventDispatcher().fire(event, this);
 				}
 			}
 			
@@ -721,6 +754,12 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 			}
 		}
 		catch (Exception e) {
+			// we could not properly finish the event itself
+			if (event != null && event.getStopped() == null) {
+				event.setStopped(new Date());
+				CEPUtils.enrich(event, e);
+				getRepository().getComplexEventDispatcher().fire(event, this);
+			}
 			fire("run", 2, workflow.getId(), "Failed while running transition '" + transition.getName() + "' (or automatic transitions after it)", Notification.format(e), Severity.ERROR, token);
 			if (e instanceof ServiceException) {
 				throw (ServiceException) e;
@@ -732,6 +771,11 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 				throw new ServiceException(e);
 			}
 		}
+	}
+
+	private void ServiceException(String string, String string2) {
+		// TODO Auto-generated method stub
+		
 	}
 
 	public void callListeners(String connectionId, WorkflowInstance workflow, WorkflowTransition transition, WorkflowState fromState, WorkflowState toState, Token token) {

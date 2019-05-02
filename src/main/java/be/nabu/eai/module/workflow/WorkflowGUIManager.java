@@ -14,6 +14,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javafx.beans.binding.DoubleBinding;
 import javafx.beans.binding.DoubleExpression;
 import javafx.beans.property.BooleanProperty;
@@ -30,6 +33,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.Separator;
 import javafx.scene.control.SplitPane;
 import javafx.scene.input.DataFormat;
 import javafx.scene.input.DragEvent;
@@ -101,6 +105,8 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		}
 	}
 	
+	private Logger logger = LoggerFactory.getLogger(getClass());
+	
 	public WorkflowGUIManager() {
 		super("Workflow", Workflow.class, new WorkflowManager(), WorkflowConfiguration.class);
 	}
@@ -111,6 +117,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 	private AnchorPane drawPane;
 	private Line draggingLine;
 	private AnchorPane mapPane;
+	private String dragMode = "move";
 
 	@Override
 	public void display(MainController controller, AnchorPane pane, Workflow artifact) {
@@ -250,7 +257,41 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 			}
 		});
 		
-		buttons.getChildren().addAll(addState, editProperties);
+		Separator separator = new Separator(Orientation.VERTICAL);
+		separator.setPadding(new Insets(0,10,0,10));
+		Button dragModeMove = new Button("Move");
+		Button dragModeConnect = new Button("Transition");
+		Button dragModeExtend = new Button("Extend");
+		dragModeMove.getStyleClass().add("armed");
+		dragModeMove.addEventHandler(ActionEvent.ANY, new EventHandler<ActionEvent>() {
+			@Override
+			public void handle(ActionEvent arg0) {
+				dragMode = "move";
+				dragModeMove.getStyleClass().add("armed");
+				dragModeConnect.getStyleClass().remove("armed");
+				dragModeExtend.getStyleClass().remove("armed");
+			}
+		});
+		dragModeConnect.addEventHandler(ActionEvent.ANY, new EventHandler<ActionEvent>() {
+			@Override
+			public void handle(ActionEvent arg0) {
+				dragMode = "connect";
+				dragModeMove.getStyleClass().remove("armed");
+				dragModeConnect.getStyleClass().add("armed");
+				dragModeExtend.getStyleClass().remove("armed");
+			}
+		});
+		dragModeExtend.addEventHandler(ActionEvent.ANY, new EventHandler<ActionEvent>() {
+			@Override
+			public void handle(ActionEvent arg0) {
+				dragMode = "extend";
+				dragModeMove.getStyleClass().remove("armed");
+				dragModeConnect.getStyleClass().remove("armed");
+				dragModeExtend.getStyleClass().add("armed");
+			}
+		});
+		
+		buttons.getChildren().addAll(addState, editProperties, separator, dragModeMove, dragModeConnect, dragModeExtend);
 		
 		ScrollPane drawScrollPane = new ScrollPane();
 		drawScrollPane.setContent(drawPane);
@@ -407,7 +448,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		rectangle.getContent().addEventHandler(MouseEvent.DRAG_DETECTED, new EventHandler<MouseEvent>() {
 			@Override
 			public void handle(MouseEvent event) {
-				if ((event.isControlDown() || event.isShiftDown()) && locked.get()) {
+				if ((event.isControlDown() || event.isShiftDown() || !dragMode.equals("move")) && locked.get()) {
 					draggingLine = new Line();
 					draggingLine.startXProperty().bind(rectangle.rightAnchorXProperty());
 					draggingLine.startYProperty().bind(rectangle.rightAnchorYProperty());
@@ -415,7 +456,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 					draggingLine.endYProperty().bind(MouseLocation.getInstance(scene).yProperty().subtract(drawPane.localToSceneTransformProperty().get().getTy()));
 					Dragboard dragboard = rectangle.getContainer().startDragAndDrop(TransferMode.LINK);
 					Map<DataFormat, Object> content = new HashMap<DataFormat, Object>();
-					content.put(TreeDragDrop.getDataFormat(event.isControlDown() ? "connect" : "extend"), state.getId());
+					content.put(TreeDragDrop.getDataFormat(event.isControlDown() || event.isShiftDown() ? (event.isShiftDown() ? "extend" : "connect") : dragMode), state.getId());
 					dragboard.setContent(content);
 					event.consume();
 					drawPane.getChildren().add(draggingLine);
@@ -430,14 +471,14 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 					event.acceptTransferModes(TransferMode.ANY);
 					event.consume();
 				}
-				else {
+				if (!event.isConsumed()) {
 					content = event.getDragboard().getContent(TreeDragDrop.getDataFormat("extend"));
 					if (content != null) {
 						boolean isAllowed = true;
 						// there should not be any transitions _to_ the state you are about to extend
-						for (WorkflowState state : workflow.getConfig().getStates()) {
-							if (state.getTransitions() != null) {
-								for (WorkflowTransition transition : state.getTransitions()) {
+						for (WorkflowState potentialState : workflow.getConfig().getStates()) {
+							if (potentialState.getTransitions() != null) {
+								for (WorkflowTransition transition : potentialState.getTransitions()) {
 									if (transition.getTargetStateId().equals(state.getId())) {
 										isAllowed = false;
 										break;

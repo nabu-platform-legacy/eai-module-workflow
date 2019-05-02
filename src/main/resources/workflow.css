@@ -55,3 +55,6 @@
 	-fx-stroke-dash-array: 25 10;
 	-fx-stroke: #3e43ff;
 }
+.armed {
+	-fx-border-color: #333;
+}
