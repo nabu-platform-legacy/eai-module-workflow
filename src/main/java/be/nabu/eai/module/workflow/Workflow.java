@@ -1128,7 +1128,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 	}
 
 	@Override
-	public List<RESTFragment> getFragments() {
+	public List<RESTFragment> getFragments(boolean limitToUser, Token token) {
 		List<RESTFragment> fragments = new ArrayList<RESTFragment>();
 		if (getConfig().getStates() != null) {
 			Collection<WorkflowState> initialStates = getInitialStates();
