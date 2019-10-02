@@ -396,7 +396,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 			event.setArtifactId(workflow.getId());
 			event.setCreated(new Date());
 			event.setStarted(event.getCreated());
-			event.setSeverity(EventSeverity.INFO);
+			event.setSeverity(EventSeverity.DEBUG);
 			if (token != null) {
 				event.setAlias(token.getName());
 				event.setRealm(token.getRealm());
