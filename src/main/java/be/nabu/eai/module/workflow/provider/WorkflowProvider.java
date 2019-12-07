@@ -71,7 +71,12 @@ public class WorkflowProvider extends JAXBArtifact<WorkflowProviderConfiguration
 							getConfiguration().getGetTransitions(),
 							getConfiguration().getGetAmountOfWorkflows(),
 							getConfiguration().getMergeDefinition(),
-							getConfiguration().getGetDefinition()
+							getConfiguration().getGetDefinition(),
+							getConfig().getCreateBatch(),
+							getConfig().getUpdateBatch(),
+							getConfig().getGetBatch(),
+							getConfig().getGetBatches(),
+							getConfig().getCalculateBatchState()
 						);
 					}
 					catch (Exception e) {
