@@ -1230,9 +1230,16 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		return null;
 	}
 
+	// currently we don't support detaching cause the mouse drawing is limited with the movable panes linked to the scenes
+	// in theory we can group on something else than the scene, but we need a generic drop listener on the whole scene just to be sure?
 	@Override
 	protected BaseArtifactGUIInstance<Workflow> newGUIInstance(Entry entry) {
-		return new BaseArtifactGUIInstance<Workflow>(this, entry);
+		return new BaseArtifactGUIInstance<Workflow>(this, entry) {
+			@Override
+			public boolean isDetachable() {
+				return false;
+			}
+		};
 	}
 
 	@Override
