@@ -244,7 +244,9 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 					mapPane.getChildren().add(split);
 					// add an editor for the transient state
 					try {
-						new StructureGUIManager().display(MainController.getInstance(), left, artifact.getStructures().get("properties"));
+						StructureGUIManager structureGUIManager = new StructureGUIManager();
+						structureGUIManager.setActualId(artifact.getId());
+						structureGUIManager.display(MainController.getInstance(), left, artifact.getStructures().get("properties"));
 					}
 					catch (Exception e) {
 						throw new RuntimeException(e);
@@ -392,7 +394,9 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 				mapPane.getChildren().add(split);
 				// add an editor for the transient state
 				try {
-					new StructureGUIManager().display(MainController.getInstance(), left, workflow.getStructures().get(state.getId()));
+					StructureGUIManager structureGUIManager = new StructureGUIManager();
+					structureGUIManager.setActualId(workflow.getId());
+					structureGUIManager.display(MainController.getInstance(), left, workflow.getStructures().get(state.getId()));
 				}
 				catch (Exception e) {
 					throw new RuntimeException(e);
