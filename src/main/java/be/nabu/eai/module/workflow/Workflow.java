@@ -881,6 +881,10 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 				}
 				try {
 					if (value != null && value) {
+						// we only ever execute automatic self transitions once, otherwise we can end up in an unending loop or force the user to always validate this themselves
+						if (isSelfTransition(possibleTransition) && hasOccurred(possibleTransition, history)) {
+							continue;
+						}
 						queryOrderMatch = possibleTransition.getQueryOrder();
 						foundNext = true;
 						// this allows us to easily build in asynchronous and/or timed executions
@@ -917,6 +921,9 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 						else {
 							run(connectionId, workflow, history, properties, possibleTransition, token, content);
 						}
+						// we don't allow multiple transitions to be executed anymore, it is impossible in a FSM to have multiple states (if parallel transitions were to go to a different state)
+						// but even if they go to the same state, suppose 1 succeeds and the other fails, did it arrive in that state? do we automatically continue?
+						break;
 					}
 				}
 				catch (Exception e) {
@@ -945,6 +952,27 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 		}
 	}
 	
+	private boolean isSelfTransition(WorkflowTransition transition) {
+		for (WorkflowState state : getConfig().getStates()) {
+			// if it starts from this state and goes back to this state, it is a self transition
+			if (state.getTransitions() != null && state.getTransitions().contains(transition)) {
+				return transition.getTargetStateId().contentEquals(state.getId());
+			}
+		}
+		return false;
+	}
+	
+	private boolean hasOccurred(WorkflowTransition transition, List<WorkflowTransitionInstance> history) {
+		if (history != null) {
+			for (WorkflowTransitionInstance instance : history) {
+				if (instance.getDefinitionId().equals(transition.getId())) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+	
 	private boolean continueBatch(WorkflowBatchInstance batch) {
 		String connectionId = getConfig().getConnection() == null ? null : getConfig().getConnection().getId();
 		WorkflowManager workflowManager = getConfig().getProvider().getWorkflowManager();
@@ -971,9 +999,11 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 	}
 	
 	private boolean canAutomaticallyTransition(WorkflowTransition transition) {
+		// if we have no query, we can't do it automatically
 		if (transition.getQuery() == null) {
 			return false;
 		}
+		// if we have a required input, we can't automatically transition
 		DefinedStructure definedStructure = getStructures().get(transition.getId());
 		for (Element<?> child : TypeUtils.getAllChildren(definedStructure)) {
 			Value<Integer> minOccurs = child.getProperty(MinOccursProperty.getInstance());
