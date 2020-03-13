@@ -295,7 +295,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		
 		buttons.getChildren().addAll(addState, editProperties, separator, dragModeMove, dragModeConnect, dragModeExtend);
 		
-		ScrollPane drawScrollPane = new ScrollPane();
+		drawScrollPane = new ScrollPane();
 		drawScrollPane.setContent(drawPane);
 		vbox.getChildren().addAll(buttons, drawScrollPane);
 		
@@ -330,6 +330,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 	}
 	
 	private String lastStateId;
+	private ScrollPane drawScrollPane;
 
 	private void drawState(final Workflow workflow, final WorkflowState state) {
 //		Paint.valueOf("#ddffcf"), Paint.valueOf("#195700")
@@ -348,14 +349,16 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		movable.xProperty().addListener(new ChangeListener<Number>() {
 			@Override
 			public void changed(ObservableValue<? extends Number> arg0, Number arg1, Number arg2) {
-				state.setX(arg2.doubleValue());
+				double scrollOffset = drawPane.getWidth() * drawScrollPane.getHvalue();
+				state.setX(arg2.doubleValue() + scrollOffset);
 				MainController.getInstance().setChanged();
 			}
 		});
 		movable.yProperty().addListener(new ChangeListener<Number>() {
 			@Override
 			public void changed(ObservableValue<? extends Number> arg0, Number arg1, Number arg2) {
-				state.setY(arg2.doubleValue());
+				double scrollOffset = drawPane.getHeight() * drawScrollPane.getVvalue();
+				state.setY(arg2.doubleValue() + scrollOffset);
 				MainController.getInstance().setChanged();
 			}
 		});
@@ -925,14 +928,16 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		movableCircle.xProperty().addListener(new ChangeListener<Number>() {
 			@Override
 			public void changed(ObservableValue<? extends Number> arg0, Number arg1, Number arg2) {
-				transition.setX(arg2.doubleValue());
+				double scrollOffset = drawPane.getWidth() * drawScrollPane.getHvalue();
+				transition.setX(arg2.doubleValue() + scrollOffset);
 				MainController.getInstance().setChanged();
 			}
 		});
 		movableCircle.yProperty().addListener(new ChangeListener<Number>() {
 			@Override
 			public void changed(ObservableValue<? extends Number> arg0, Number arg1, Number arg2) {
-				transition.setY(arg2.doubleValue());
+				double scrollOffset = drawPane.getHeight() * drawScrollPane.getVvalue();
+				transition.setY(arg2.doubleValue() + scrollOffset);
 				MainController.getInstance().setChanged();
 			}
 		});
