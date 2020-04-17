@@ -264,8 +264,8 @@ public class WorkflowManager extends JAXBArtifactManager<WorkflowConfiguration, 
 		Map<String, WorkflowState> initialStates = new HashMap<String, WorkflowState>();
 		List<String> targetedStates = new ArrayList<String>();
 		for (WorkflowState state : artifact.getConfig().getStates()) {
-			// extension states are not initial states
-			if (!artifact.isExtensionState(state.getId()) && !artifact.isExtensionState(state.getName())) {
+			// extension states are not initial states, nor are global states
+			if (!artifact.isExtensionState(state.getId()) && !artifact.isExtensionState(state.getName()) && !state.isGlobalState()) {
 				initialStates.put(state.getId(), state);
 			}
 			for (WorkflowTransition transition : state.getTransitions()) {

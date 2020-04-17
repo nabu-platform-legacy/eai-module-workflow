@@ -15,6 +15,10 @@ public class WorkflowState {
 	private List<String> extensions;
 	// visual positioning
 	private double x, y;
+	// a global state is inherently extended by all other states, this means it has no extensions, nothing going to it but it is _not_ an initial state
+	// nor will it require a force to run it, no matter in which state the workflow is
+	// this is mostly interesting for generic stuff like cancel or for example adding a comment, attachment... something that is always allowed
+	private boolean globalState;
 	
 	public String getId() {
 		return id;
@@ -63,4 +67,11 @@ public class WorkflowState {
 	public void setExtensions(List<String> extensions) {
 		this.extensions = extensions;
 	}
+	public boolean isGlobalState() {
+		return globalState;
+	}
+	public void setGlobalState(boolean globalState) {
+		this.globalState = globalState;
+	}
+	
 }

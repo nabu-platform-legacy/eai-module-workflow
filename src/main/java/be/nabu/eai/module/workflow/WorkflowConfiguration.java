@@ -15,7 +15,7 @@ import be.nabu.libs.artifacts.api.DataSourceProviderArtifact;
 import be.nabu.libs.services.api.DefinedService;
 
 @XmlRootElement(name = "workflow")
-@XmlType(propOrder = { "connection", "provider", "version", "states", "permissionService", "roleService", "tokenValidatorService", "transitionListeners" })
+@XmlType(propOrder = { "connection", "provider", "version", "states", "permissionService", "roleService", "tokenValidatorService", "transitionListeners", "basePath" })
 public class WorkflowConfiguration {
 	
 	private boolean version;
@@ -24,6 +24,7 @@ public class WorkflowConfiguration {
 	private List<WorkflowState> states;
 	private DefinedService permissionService, roleService, tokenValidatorService;
 	private List<DefinedService> transitionListeners;
+	private String basePath;
 	
 	@XmlJavaTypeAdapter(value = ArtifactXMLAdapter.class)
 	public WorkflowProvider getProvider() {
@@ -97,5 +98,11 @@ public class WorkflowConfiguration {
 		this.version = version;
 	}
 	
+	public String getBasePath() {
+		return basePath;
+	}
+	public void setBasePath(String basePath) {
+		this.basePath = basePath;
+	}
 	
 }

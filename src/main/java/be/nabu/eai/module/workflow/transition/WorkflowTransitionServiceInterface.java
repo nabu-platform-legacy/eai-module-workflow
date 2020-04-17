@@ -7,11 +7,13 @@ import be.nabu.eai.module.workflow.WorkflowState;
 import be.nabu.eai.module.workflow.WorkflowTransition;
 import be.nabu.eai.repository.EAIRepositoryUtils;
 import be.nabu.eai.repository.api.Repository;
+import be.nabu.libs.property.ValueUtils;
 import be.nabu.libs.services.api.DefinedServiceInterface;
 import be.nabu.libs.services.api.ServiceInterface;
 import be.nabu.libs.types.SimpleTypeWrapperFactory;
 import be.nabu.libs.types.TypeUtils;
 import be.nabu.libs.types.api.ComplexType;
+import be.nabu.libs.types.api.Element;
 import be.nabu.libs.types.base.ComplexElementImpl;
 import be.nabu.libs.types.base.SimpleElementImpl;
 import be.nabu.libs.types.base.ValueImpl;
@@ -45,8 +47,11 @@ public class WorkflowTransitionServiceInterface implements DefinedServiceInterfa
 						input.add(new SimpleElementImpl<String>("connectionId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
 						if (!isInitial) {
 							input.add(new SimpleElementImpl<String>("workflowId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input));
-							input.add(new SimpleElementImpl<Boolean>("force", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(Boolean.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "If the workflow is not in the correct state, do you still want to trigger this transition? This is especially interesting for forcing a retry at a specific state.")));
-							input.add(new SimpleElementImpl<Boolean>("bestEffort", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(Boolean.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "If the workflow is not in the correct state, do you want an exception or just leave it? This is especially interesting for timed transitions that are used as a fallback.")));
+							// a global state can be called from anywhere, force and besteffort have no power here
+							if (!fromState.isGlobalState()) {
+								input.add(new SimpleElementImpl<Boolean>("force", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(Boolean.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "If the workflow is not in the correct state, do you still want to trigger this transition? This is especially interesting for forcing a retry at a specific state.")));
+								input.add(new SimpleElementImpl<Boolean>("bestEffort", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(Boolean.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "If the workflow is not in the correct state, do you want an exception or just leave it? This is especially interesting for timed transitions that are used as a fallback.")));
+							}
 						}
 						else {
 							input.add(new SimpleElementImpl<String>("workflowId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "A pregenerated id for the workflow")));
@@ -64,7 +69,20 @@ public class WorkflowTransitionServiceInterface implements DefinedServiceInterfa
 						}
 						ComplexType transitionType = (ComplexType) getRepository().resolve(workflow.getId() + ".types.transitions." + EAIRepositoryUtils.stringToField(transition.getName()));
 						if (transitionType != null && !TypeUtils.getAllChildren(transitionType).isEmpty()) {
-							input.add(new ComplexElementImpl("transition", transitionType, input));
+							ComplexElementImpl element = new ComplexElementImpl("transition", transitionType, input);
+							input.add(element);
+							// if the transition has no mandatory fields, set it to optional
+							boolean optional = true;
+							for (Element<?> child : TypeUtils.getAllChildren(element.getType())) {
+								Integer minOccurs = ValueUtils.getValue(MinOccursProperty.getInstance(), child.getProperties());
+								if (minOccurs == null || minOccurs != 0) {
+									optional = false;
+									break;
+								}
+							}
+							if (optional) {
+								element.setProperty(new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0));
+							}
 						}
 //						input.add(new SimpleElementImpl<Boolean>("asynchronous", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(Boolean.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "Whether or not the execution should be done asynchronously")));
 						this.input = input;

@@ -27,6 +27,9 @@ import be.nabu.libs.services.api.ServiceInstance;
 import be.nabu.libs.services.api.ServiceInterface;
 import be.nabu.libs.types.api.Element;
 import be.nabu.libs.types.api.Type;
+import be.nabu.libs.types.base.ValueImpl;
+import be.nabu.libs.types.properties.RestrictProperty;
+import be.nabu.libs.types.structure.Structure;
 
 public class WorkflowTransitionService implements DefinedService, WebFragment, RESTFragment {
 
@@ -106,7 +109,8 @@ public class WorkflowTransitionService implements DefinedService, WebFragment, R
 				artifact,
 				serviceInterface.getWorkflow(), 
 				Charset.defaultCharset(),
-				this
+				this,
+				restPath
 			);
 			EventSubscription<HTTPRequest, HTTPResponse> subscription = artifact.getDispatcher().subscribe(HTTPRequest.class, listener);
 			subscription.filter(HTTPServerUtils.limitToPath(restPath));
@@ -140,7 +144,8 @@ public class WorkflowTransitionService implements DefinedService, WebFragment, R
 	@Override
 	public String getPath() {
 		String cleanName = EAIRepositoryUtils.stringToField(getName());
-		return getWorkflow().getId() + "/" + cleanName;
+		String basePath = getWorkflow().getConfig().getBasePath();
+		return ("/" + (basePath == null ? "" : basePath + "/") + cleanName).replaceAll("[/]{2,}", "/");
 	}
 
 	@Override
@@ -160,7 +165,11 @@ public class WorkflowTransitionService implements DefinedService, WebFragment, R
 
 	@Override
 	public Type getInput() {
-		return getServiceInterface().getInputDefinition();
+		Structure structure = new Structure();
+		structure.setName("input");
+		structure.setSuperType(getServiceInterface().getInputDefinition());
+		structure.setProperty(new ValueImpl<String>(RestrictProperty.getInstance(), "connectionId,force,bestEffort"));
+		return structure;
 	}
 
 	@Override

@@ -30,6 +30,8 @@ public class WorkflowTransition implements Comparable<WorkflowTransition> {
 	private double x, y;
 	// the operation id for this transition
 	private String operationId;
+	// the permission context to use (if any)
+	private String permissionContext, permissionAction;
 	
 	private String target;
 	
@@ -126,6 +128,19 @@ public class WorkflowTransition implements Comparable<WorkflowTransition> {
 	}
 	public void setTargetProperties(Map<String, String> targetProperties) {
 		this.targetProperties = targetProperties;
+	}
+	
+	public String getPermissionContext() {
+		return permissionContext;
+	}
+	public void setPermissionContext(String permissionContext) {
+		this.permissionContext = permissionContext;
+	}
+	public String getPermissionAction() {
+		return permissionAction;
+	}
+	public void setPermissionAction(String permissionAction) {
+		this.permissionAction = permissionAction;
 	}
 	
 }

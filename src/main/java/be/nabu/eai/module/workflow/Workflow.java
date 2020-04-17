@@ -1081,7 +1081,9 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 		Map<String, WorkflowState> initialStates = new HashMap<String, WorkflowState>();
 		List<String> targetedStates = new ArrayList<String>();
 		for (WorkflowState state : getConfig().getStates()) {
-			initialStates.put(state.getId(), state);
+			if (!state.isGlobalState()) {
+				initialStates.put(state.getId(), state);
+			}
 			for (WorkflowTransition transition : state.getTransitions()) {
 				targetedStates.add(transition.getTargetStateId());
 			}
@@ -1155,10 +1157,14 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 		if (!fullPath.endsWith("/")) {
 			fullPath += "/";
 		}
-		fullPath += getId();
-		
 		EventDispatcher dispatcher = artifact.getConfiguration().getVirtualHost().getDispatcher();
-		EventSubscription<HTTPRequest, HTTPResponse> subscription = dispatcher.subscribe(HTTPRequest.class, new WorkflowRESTListener(artifact, this, Charset.defaultCharset(), null));
+		// we want to send the full path without base path here as the getPath() in the workflow transition service includes the base path
+		EventSubscription<HTTPRequest, HTTPResponse> subscription = dispatcher.subscribe(HTTPRequest.class, new WorkflowRESTListener(artifact, this, Charset.defaultCharset(), null, fullPath));
+		// to filter, we want to add the base path as well
+		if (getConfig().getBasePath() != null) {
+			fullPath += getConfig().getBasePath();
+			fullPath = fullPath.replaceAll("[/]{2,}", "/");
+		}
 		subscription.filter(HTTPServerUtils.limitToPath(fullPath));
 		
 		List<EventSubscription<?, ?>> list = subscriptions.get(key);

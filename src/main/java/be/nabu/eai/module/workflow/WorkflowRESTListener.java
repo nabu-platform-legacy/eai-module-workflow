@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import be.nabu.eai.module.web.application.WebApplication;
 import be.nabu.eai.module.web.application.WebApplicationUtils;
@@ -16,6 +17,12 @@ import be.nabu.eai.module.workflow.transition.WorkflowTransitionService;
 import be.nabu.eai.repository.EAIResourceRepository;
 import be.nabu.libs.authentication.api.Device;
 import be.nabu.libs.authentication.api.Token;
+import be.nabu.libs.evaluator.EvaluationException;
+import be.nabu.libs.evaluator.PathAnalyzer;
+import be.nabu.libs.evaluator.QueryParser;
+import be.nabu.libs.evaluator.impl.VariableOperation;
+import be.nabu.libs.evaluator.types.api.TypeOperation;
+import be.nabu.libs.evaluator.types.operations.TypesOperationProvider;
 import be.nabu.libs.events.api.EventHandler;
 import be.nabu.libs.http.HTTPCodes;
 import be.nabu.libs.http.HTTPException;
@@ -51,12 +58,14 @@ public class WorkflowRESTListener implements EventHandler<HTTPRequest, HTTPRespo
 	private Charset charset;
 	private WebApplication application;
 	private WorkflowTransitionService service;
+	private String fullPath;
 
-	public WorkflowRESTListener(WebApplication application, Workflow workflow, Charset charset, WorkflowTransitionService service) {
+	public WorkflowRESTListener(WebApplication application, Workflow workflow, Charset charset, WorkflowTransitionService service, String fullPath) {
 		this.application = application;
 		this.workflow = workflow;
 		this.charset = charset;
 		this.service = service;
+		this.fullPath = fullPath;
 	}
 	
 	@Override
@@ -66,33 +75,40 @@ public class WorkflowRESTListener implements EventHandler<HTTPRequest, HTTPRespo
 			URI uri = HTTPUtils.getURI(request, false);
 			String path = URIUtils.normalize(uri.getPath());
 			
-			// the last part is the transition
-			String transition = path.replaceAll("^.*/", "");
+			if (!path.startsWith(fullPath)) {
+				return null;
+			}
+			path = path.substring(fullPath.length());
 			
-			WorkflowTransitionService service;
+			WorkflowTransitionService service = null;
+			// we mounted a specific service
 			if (this.service != null) {
-				if (this.service.isInitial() && !"POST".equalsIgnoreCase(request.getMethod())) {
-					throw new HTTPException(404, "Only post allowed for create");
-				}
-				else if (!this.service.isInitial() && !"PUT".equalsIgnoreCase(request.getMethod())) {
-					throw new HTTPException(404, "Only put allowed for update");
+				if (!path.equals(this.service.getPath())) {
+					return null;
 				}
 				else {
 					service = this.service;
 				}
 			}
-			else if ("POST".equalsIgnoreCase(request.getMethod())) {
-				service = (WorkflowTransitionService) workflow.getRepository().resolve(workflow.getId() + ".services.initial." + transition);	
-			}
-			else if ("PUT".equalsIgnoreCase(request.getMethod())) {
-				service = (WorkflowTransitionService) workflow.getRepository().resolve(workflow.getId() + ".services.transition." + transition);
-			}
 			else {
-				throw new HTTPException(404, "Only post and put are supported");
+				for (WorkflowTransitionService potentialService : workflow.getRepository().getArtifacts(WorkflowTransitionService.class)) {
+					if (potentialService.getWorkflow().getId().equals(workflow.getId()) && potentialService.getPath().equals(path)) {
+						service = potentialService;
+						break;
+					}
+				}
 			}
 			
+			// not part of this workflow, let some other handler fix it
 			if (service == null) {
-				throw new HTTPException(404, "Could not find transition: " + transition);
+				return null;
+			}
+			
+			if (service.isInitial() && !"POST".equalsIgnoreCase(request.getMethod())) {
+				throw new HTTPException(404, "Only post allowed for create");
+			}
+			else if (!service.isInitial() && !"PUT".equalsIgnoreCase(request.getMethod())) {
+				throw new HTTPException(404, "Only put allowed for update");
 			}
 
 			return process(application, charset, request, service);
@@ -104,11 +120,41 @@ public class WorkflowRESTListener implements EventHandler<HTTPRequest, HTTPRespo
 			ServiceRuntime.setGlobalContext(null);
 		}
 	}
+	
+	private Map<String, TypeOperation> analyzedOperations = new HashMap<String, TypeOperation>();
+	
+	protected TypeOperation getOperation(String query) throws ParseException {
+		if (!analyzedOperations.containsKey(query)) {
+			synchronized(analyzedOperations) {
+				if (!analyzedOperations.containsKey(query))
+					analyzedOperations.put(query, (TypeOperation) new PathAnalyzer<ComplexContent>(new TypesOperationProvider()).analyze(QueryParser.getInstance().parse(query)));
+			}
+		}
+		return analyzedOperations.get(query);
+	}
+	
+	protected Object getVariable(ComplexContent pipeline, String query) throws ServiceException {
+		VariableOperation.registerRoot();
+		try {
+			return getOperation(query).evaluate(pipeline);
+		}
+		catch (EvaluationException e) {
+			throw new ServiceException(e);
+		}
+		catch (ParseException e) {
+			throw new ServiceException(e);
+		}
+		finally {
+			VariableOperation.unregisterRoot();
+		}
+	}
 
-	public static HTTPResponse process(WebApplication application, Charset charset, HTTPRequest request, WorkflowTransitionService service) throws IOException, ParseException, ServiceException {
+	public HTTPResponse process(WebApplication application, Charset charset, HTTPRequest request, WorkflowTransitionService service) throws IOException, ParseException, ServiceException {
 		Token token = WebApplicationUtils.getToken(application, request);
 		Device device = WebApplicationUtils.getDevice(application, request, token);
-		WebApplicationUtils.checkRole(application, token, service.getTransition().getRoles());
+		if (service.getTransition().getRoles() != null && !service.getTransition().getRoles().isEmpty()) {
+			WebApplicationUtils.checkRole(application, token, service.getTransition().getRoles());
+		}
 		HTTPResponse checkRateLimits = WebApplicationUtils.checkRateLimits(application, token, device, service.getId(), null, request);
 		if (checkRateLimits != null) {
 			return checkRateLimits;
@@ -145,6 +191,17 @@ public class WorkflowRESTListener implements EventHandler<HTTPRequest, HTTPRespo
 			}
 		}
 		
+		if (service.getTransition().getPermissionAction() != null) {
+			String permissionContext = service.getTransition().getPermissionContext();
+			if (permissionContext != null && permissionContext.startsWith("=")) {
+				Object result = getVariable(input, permissionContext.substring(1));
+				if (result != null) {
+					permissionContext = result.toString();
+				}
+			}
+			WebApplicationUtils.checkPermission(application, token, service.getTransition().getPermissionAction(), permissionContext);
+		}
+		
 		ServiceRuntime runtime = new ServiceRuntime(service, application.getRepository().newExecutionContext(token));
 		runtime.getContext().put("session", WebApplicationUtils.getSession(application, request));
 		runtime.getContext().put("device", device);
@@ -162,7 +219,7 @@ public class WorkflowRESTListener implements EventHandler<HTTPRequest, HTTPRespo
 				// domain
 				null, 
 				// secure TODO?
-				false,
+				application.isSecure(),
 				// http only
 				true
 			);
