@@ -4,11 +4,12 @@ import java.net.URI;
 import java.util.Date;
 
 import javax.validation.constraints.NotNull;
-import javax.xml.bind.annotation.XmlRootElement;
-import javax.xml.bind.annotation.XmlType;
 
-@XmlRootElement
-@XmlType(propOrder = { "id", "definitionId", "version", "parentId", "batchId", "contextId", "groupId", "correlationId", "workflowType", "uri", "started", "stopped", "environment", "transitionState", "stateId" })
+import be.nabu.libs.types.api.annotation.ComplexTypeDescriptor;
+import be.nabu.libs.types.api.annotation.Field;
+
+@ComplexTypeDescriptor(collectionName = "WorkflowInstances",
+	propOrder = { "id", "definitionId", "version", "parentId", "batchId", "contextId", "groupId", "correlationId", "workflowType", "uri", "started", "stopped", "environment", "transitionState", "stateId" })
 public class WorkflowInstance {
 	private String id, parentId, definitionId;
 	private Date started, stopped;
@@ -18,6 +19,7 @@ public class WorkflowInstance {
 	// the version of the workflow you are running
 	private Long version;
 	
+	@Field(primary = true)
 	@NotNull
 	public String getId() {
 		return id;

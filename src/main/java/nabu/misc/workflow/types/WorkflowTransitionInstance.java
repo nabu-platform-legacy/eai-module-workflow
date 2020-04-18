@@ -5,13 +5,13 @@ import java.util.Date;
 
 import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Size;
-import javax.xml.bind.annotation.XmlRootElement;
-import javax.xml.bind.annotation.XmlType;
 
+import be.nabu.libs.types.api.annotation.ComplexTypeDescriptor;
+import be.nabu.libs.types.api.annotation.Field;
 import nabu.misc.workflow.types.WorkflowInstance.Level;
 
-@XmlRootElement
-@XmlType(propOrder = { "id", "definitionId", "workflowId", "parentId", "actorId", "systemId", "started", "stopped", "uri", "log", "code", "errorLog", "errorCode", "sequence", "transitionState", "fromStateId", "toStateId", "batchId" })
+@ComplexTypeDescriptor(collectionName = "WorkflowTransitionInstances",
+	propOrder = { "id", "definitionId", "workflowId", "parentId", "actorId", "systemId", "started", "stopped", "uri", "log", "code", "errorLog", "errorCode", "sequence", "transitionState", "fromStateId", "toStateId", "batchId" })
 public class WorkflowTransitionInstance implements Comparable<WorkflowTransitionInstance> {
 	// the parent id is of the transition that came before
 	private String id, workflowId, parentId, definitionId;
@@ -36,6 +36,7 @@ public class WorkflowTransitionInstance implements Comparable<WorkflowTransition
 	// a lot of workflows revolve around data, this allows you to log an URI reference to data relevant for this transition
 	private URI uri;
 	
+	@Field(primary = true)
 	@NotNull
 	public String getId() {
 		return id;

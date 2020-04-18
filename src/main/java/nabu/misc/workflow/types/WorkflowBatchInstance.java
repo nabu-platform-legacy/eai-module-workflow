@@ -2,13 +2,12 @@ package nabu.misc.workflow.types;
 
 import java.util.Date;
 
-import javax.xml.bind.annotation.XmlRootElement;
-import javax.xml.bind.annotation.XmlType;
-
+import be.nabu.libs.types.api.annotation.ComplexTypeDescriptor;
+import be.nabu.libs.types.api.annotation.Field;
 import nabu.misc.workflow.types.WorkflowInstance.Level;
 
-@XmlRootElement
-@XmlType(propOrder = { "id", "workflowId", "transitionId", "systemId", "started", "created", "stopped", "state" })
+@ComplexTypeDescriptor(collectionName = "WorkflowBatchInstances",
+	propOrder = { "id", "workflowId", "transitionId", "systemId", "started", "created", "stopped", "state" })
 public class WorkflowBatchInstance {
 	// the id of the batch and of the workflow that created the batch as well as the transition that created the batch
 	private String id, workflowId, transitionId, systemId;
@@ -18,6 +17,7 @@ public class WorkflowBatchInstance {
 	// the state of the batch
 	private Level state;
 	
+	@Field(primary = true)
 	public String getId() {
 		return id;
 	}

@@ -1,13 +1,12 @@
 package nabu.misc.workflow.types;
 
 import javax.validation.constraints.NotNull;
-import javax.xml.bind.annotation.XmlRootElement;
-import javax.xml.bind.annotation.XmlType;
 
 import be.nabu.libs.types.api.KeyValuePair;
+import be.nabu.libs.types.api.annotation.ComplexTypeDescriptor;
 
-@XmlRootElement
-@XmlType(propOrder = { "id", "workflowId", "key", "value", "transitionId" })
+@ComplexTypeDescriptor(collectionName = "WorkflowInstanceProperties",
+	propOrder = { "id", "workflowId", "key", "value", "transitionId" })
 public class WorkflowInstanceProperty implements KeyValuePair {
 
 	private String id, workflowId, key, value, transitionId;
