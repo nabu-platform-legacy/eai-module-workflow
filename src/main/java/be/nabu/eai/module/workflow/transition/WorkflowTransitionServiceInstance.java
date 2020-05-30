@@ -113,6 +113,10 @@ public class WorkflowTransitionServiceInstance implements ServiceInstance {
 			
 			instance = workflowManager.getWorkflow(connectionId, workflowId);
 			
+			if (!service.getWorkflow().getId().equals(instance.getDefinitionId())) {
+				throw new ServiceException("WORKFLOW-6", "The workflow is not of the correct type, expecting a '" + service.getWorkflow().getId() + "' but received an instance of '" + instance.getDefinitionId() + "'");
+			}
+			
 			// a global state can be triggered from anywhere
 			if (!instance.getStateId().equals(service.getFromState().getId()) && !service.getFromState().isGlobalState()) {
 				// check if the "from state" is actually an extension

@@ -724,7 +724,6 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 				}
 			}
 			
-			
 			// continue execution
 			if (!isFinalState) {
 				// make sure the current transition is reflected in the history

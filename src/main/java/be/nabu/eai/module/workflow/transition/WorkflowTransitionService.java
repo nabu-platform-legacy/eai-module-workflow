@@ -145,6 +145,12 @@ public class WorkflowTransitionService implements DefinedService, WebFragment, R
 	public String getPath() {
 		String cleanName = EAIRepositoryUtils.stringToField(getName());
 		String basePath = getWorkflow().getConfig().getBasePath();
+		if (basePath == null) {
+			basePath = getWorkflow().getId();
+		}
+		else if (basePath.equals("/")) {
+			basePath = null;
+		}
 		return ("/" + (basePath == null ? "" : basePath + "/") + cleanName).replaceAll("[/]{2,}", "/");
 	}
 

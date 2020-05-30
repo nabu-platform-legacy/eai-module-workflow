@@ -35,6 +35,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Separator;
 import javafx.scene.control.SplitPane;
+import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.DataFormat;
 import javafx.scene.input.DragEvent;
 import javafx.scene.input.Dragboard;
@@ -350,6 +351,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 			@Override
 			public void changed(ObservableValue<? extends Number> arg0, Number arg1, Number arg2) {
 				double scrollOffset = drawPane.getWidth() * drawScrollPane.getHvalue();
+				scrollOffset = 0;
 				state.setX(arg2.doubleValue() + scrollOffset);
 				MainController.getInstance().setChanged();
 			}
@@ -358,6 +360,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 			@Override
 			public void changed(ObservableValue<? extends Number> arg0, Number arg1, Number arg2) {
 				double scrollOffset = drawPane.getHeight() * drawScrollPane.getVvalue();
+				scrollOffset = 0;
 				state.setY(arg2.doubleValue() + scrollOffset);
 				MainController.getInstance().setChanged();
 			}
@@ -502,6 +505,21 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 						}
 					}
 				}
+				// we _could_ do further checking but...not now :|
+				if (!event.isConsumed()) {
+					String transitionFrom = (String) event.getDragboard().getContent(TreeDragDrop.getDataFormat("workflow-transition-from"));
+					if (transitionFrom != null) {
+						event.acceptTransferModes(TransferMode.MOVE);
+						event.consume();
+					}
+				}
+				if (!event.isConsumed()) {
+					String transitionTo = (String) event.getDragboard().getContent(TreeDragDrop.getDataFormat("workflow-transition-to"));
+					if (transitionTo != null) {
+						event.acceptTransferModes(TransferMode.MOVE);
+						event.consume();
+					}
+				}
 			}
 		});
 		rectangle.getContent().addEventHandler(DragEvent.DRAG_DROPPED, new EventHandler<DragEvent>() {
@@ -551,7 +569,6 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 											RectangleWithHooks rectangleWithHooks = states.get(state.getId());
 											transition.setX(state.getX() + rectangleWithHooks.getContent().getWidth() + ((child.getX() - (state.getX() + rectangleWithHooks.getContent().getWidth())) / 2));
 											transition.setY(state.getY() + (rectangleWithHooks.getContent().getHeight() / 2) - 5);
-	
 											
 											Structure input = new Structure();
 											input.setName("input");
@@ -618,6 +635,37 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 								drawExtension(workflow, stateById, state);
 								MainController.getInstance().setChanged();
 							}
+						}
+					}
+				}
+				String transitionFrom = (String) event.getDragboard().getContent(TreeDragDrop.getDataFormat("workflow-transition-from"));
+				String transitionTo = (String) event.getDragboard().getContent(TreeDragDrop.getDataFormat("workflow-transition-to"));
+				
+				// we want to change the transition origin state
+				if (transitionFrom != null) {
+					WorkflowTransition transition = workflow.getTransitionById(transitionFrom);
+					if (transition != null) {
+						WorkflowState originState = workflow.getTransitionFromState(transition.getId());
+						if (originState != null && !originState.equals(state)) {
+							undrawTransition(transition);
+							originState.getTransitions().remove(transition);
+							MainController.getInstance().setChanged();
+							if (state.getTransitions() == null) {
+								state.setTransitions(new ArrayList<WorkflowTransition>());
+							}
+							state.getTransitions().add(transition);
+							drawTransition(workflow, state, transition);
+						}
+					}
+				}
+				if (transitionTo != null) {
+					WorkflowTransition transition = workflow.getTransitionById(transitionTo);
+					if (transition != null && !transition.getTargetStateId().equals(state.getId())) {
+						WorkflowState originState = workflow.getTransitionFromState(transition.getId());
+						if (originState != null) {
+							undrawTransition(transition);
+							transition.setTargetStateId(state.getId());
+							drawTransition(workflow, originState, transition);
 						}
 					}
 				}
@@ -763,14 +811,18 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 	}
 	
 	private void removeTransition(final Workflow workflow, final WorkflowState state, final WorkflowTransition transition) {
-		if (transitions.containsKey(transition.getId())) {
-			drawPane.getChildren().removeAll(transitions.get(transition.getId()));
-			transitions.remove(transition.getId());
-		}
+		undrawTransition(transition);
 		state.getTransitions().remove(transition);
 		workflow.getStructures().remove(transition.getId());
 		workflow.getMappings().remove(transition.getId());
 		MainController.getInstance().setChanged();
+	}
+
+	private void undrawTransition(final WorkflowTransition transition) {
+		if (transitions.containsKey(transition.getId())) {
+			drawPane.getChildren().removeAll(transitions.get(transition.getId()));
+			transitions.remove(transition.getId());
+		}
 	}
 	
 	private void removeExtension(final Workflow workflow, final WorkflowState child, final WorkflowState parent) {
@@ -929,6 +981,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 			@Override
 			public void changed(ObservableValue<? extends Number> arg0, Number arg1, Number arg2) {
 				double scrollOffset = drawPane.getWidth() * drawScrollPane.getHvalue();
+				scrollOffset = 0;
 				transition.setX(arg2.doubleValue() + scrollOffset);
 				MainController.getInstance().setChanged();
 			}
@@ -937,6 +990,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 			@Override
 			public void changed(ObservableValue<? extends Number> arg0, Number arg1, Number arg2) {
 				double scrollOffset = drawPane.getHeight() * drawScrollPane.getVvalue();
+				scrollOffset = 0;
 				transition.setY(arg2.doubleValue() + scrollOffset);
 				MainController.getInstance().setChanged();
 			}
@@ -951,12 +1005,44 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		line1.startYProperty().bind(picker.yProperty());
 //		line1.startXProperty().bind(states.get(state.getId()).rightAnchorXProperty());
 //		line1.startYProperty().bind(states.get(state.getId()).rightAnchorYProperty());
+		// set initial
+		transition.setLine1FromX(picker.xProperty().get());
+		transition.setLine1FromY(picker.yProperty().get());
+		// listen to changes
+		picker.xProperty().addListener(new ChangeListener<Number>() {
+			@Override
+			public void changed(ObservableValue<? extends Number> observable, Number oldValue, Number newValue) {
+				transition.setLine1FromX(newValue.doubleValue());
+			}
+		});
+		picker.yProperty().addListener(new ChangeListener<Number>() {
+			@Override
+			public void changed(ObservableValue<? extends Number> observable, Number oldValue, Number newValue) {
+				transition.setLine1FromY(newValue.doubleValue());
+			}
+		});
 		
 		picker = getPicker(line1.startXProperty(), line1.startYProperty(), pane, circle);
 		line1.endXProperty().bind(picker.xProperty());
 		line1.endYProperty().bind(picker.yProperty());
 //		line1.endXProperty().bind(pane.layoutXProperty());
 //		line1.endYProperty().bind(pane.layoutYProperty().add(circle.layoutYProperty()).add(circle.centerYProperty()));
+		// set initial
+		transition.setLine1ToX(picker.xProperty().get());
+		transition.setLine1ToY(picker.yProperty().get());
+		// listen to changes
+		picker.xProperty().addListener(new ChangeListener<Number>() {
+			@Override
+			public void changed(ObservableValue<? extends Number> observable, Number oldValue, Number newValue) {
+				transition.setLine1ToX(newValue.doubleValue());
+			}
+		});
+		picker.yProperty().addListener(new ChangeListener<Number>() {
+			@Override
+			public void changed(ObservableValue<? extends Number> observable, Number oldValue, Number newValue) {
+				transition.setLine1ToY(newValue.doubleValue());
+			}
+		});
 		
 		Line line2 = new Line();
 		
@@ -1014,7 +1100,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 						}
 						return true;
 					}
-				}, "x", "y", "targetStateId", "id", "name", "target", "targetProperties");
+				}, "x", "y", "targetStateId", "id", "name", "target", "targetProperties", "line1FromX", "line1FromY", "line1ToX", "line1ToY", "line2FromX", "line2FromY", "line2ToX", "line2ToY");
 				createUpdater.setSourceId(workflow.getId());
 				MainController.getInstance().showProperties(createUpdater, right, true);
 			
@@ -1120,6 +1206,25 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 			}
 		};
 		
+		line1.addEventHandler(MouseEvent.DRAG_DETECTED, new EventHandler<MouseEvent>() {
+			@Override
+			public void handle(MouseEvent event) {
+				Dragboard dragboard = line1.startDragAndDrop(TransferMode.MOVE);
+				ClipboardContent clipboard = new ClipboardContent();
+				clipboard.put(TreeDragDrop.getDataFormat("workflow-transition-from"), transition.getId());
+				dragboard.setContent(clipboard);
+			}
+		});
+		line2.addEventHandler(MouseEvent.DRAG_DETECTED, new EventHandler<MouseEvent>() {
+			@Override
+			public void handle(MouseEvent event) {
+				Dragboard dragboard = line1.startDragAndDrop(TransferMode.MOVE);
+				ClipboardContent clipboard = new ClipboardContent();
+				clipboard.put(TreeDragDrop.getDataFormat("workflow-transition-to"), transition.getId());
+				dragboard.setContent(clipboard);
+			}
+		});
+		
 		line1.addEventHandler(MouseEvent.MOUSE_CLICKED, mouseEventHandler);
 		line2.addEventHandler(MouseEvent.MOUSE_CLICKED, mouseEventHandler);
 		
@@ -1151,10 +1256,42 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		line2.startYProperty().bind(picker.yProperty());
 //		line2.startXProperty().bind(pane.layoutXProperty().add(circle.radiusProperty().multiply(2)));
 //		line2.startYProperty().bind(pane.layoutYProperty().add(circle.layoutYProperty()).add(circle.centerYProperty()));
+		// set initial
+		transition.setLine2FromX(picker.xProperty().get());
+		transition.setLine2FromY(picker.yProperty().get());
+		// listen to changes
+		picker.xProperty().addListener(new ChangeListener<Number>() {
+			@Override
+			public void changed(ObservableValue<? extends Number> observable, Number oldValue, Number newValue) {
+				transition.setLine2FromX(newValue.doubleValue());
+			}
+		});
+		picker.yProperty().addListener(new ChangeListener<Number>() {
+			@Override
+			public void changed(ObservableValue<? extends Number> observable, Number oldValue, Number newValue) {
+				transition.setLine2FromY(newValue.doubleValue());
+			}
+		});
 		
 		picker = getPicker(line2.startXProperty(), line2.startYProperty(), states.get(transition.getTargetStateId()));
 		line2.endXProperty().bind(picker.xProperty());
 		line2.endYProperty().bind(picker.yProperty());
+		// set initial
+		transition.setLine2ToX(picker.xProperty().get());
+		transition.setLine2ToY(picker.yProperty().get());
+		// listen to changes
+		picker.xProperty().addListener(new ChangeListener<Number>() {
+			@Override
+			public void changed(ObservableValue<? extends Number> observable, Number oldValue, Number newValue) {
+				transition.setLine2ToX(newValue.doubleValue());
+			}
+		});
+		picker.yProperty().addListener(new ChangeListener<Number>() {
+			@Override
+			public void changed(ObservableValue<? extends Number> observable, Number oldValue, Number newValue) {
+				transition.setLine2ToY(newValue.doubleValue());
+			}
+		});
 //		line2.endXProperty().bind(states.get(transition.getTargetStateId()).leftAnchorXProperty());
 //		line2.endYProperty().bind(states.get(transition.getTargetStateId()).leftAnchorYProperty());
 		line2.addEventHandler(KeyEvent.KEY_PRESSED, new EventHandler<KeyEvent>() {

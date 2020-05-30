@@ -28,6 +28,11 @@ public class WorkflowTransition implements Comparable<WorkflowTransition> {
 	private boolean startBatch;
 	// the connecting circle
 	private double x, y;
+	// the following coordinates are mostly relevant when trying to redraw the diagram in other locations
+	// the from and to coordinates of the line from state to circle
+	private double line1FromX, line1FromY, line1ToX, line1ToY;
+	// the from and to coordinates of the lines from circle to next state
+	private double line2FromX, line2FromY, line2ToX, line2ToY;
 	// the operation id for this transition
 	private String operationId;
 	// the permission context to use (if any)
@@ -142,5 +147,52 @@ public class WorkflowTransition implements Comparable<WorkflowTransition> {
 	public void setPermissionAction(String permissionAction) {
 		this.permissionAction = permissionAction;
 	}
-	
+	public double getLine1FromX() {
+		return line1FromX;
+	}
+	public void setLine1FromX(double line1FromX) {
+		this.line1FromX = line1FromX;
+	}
+	public double getLine1FromY() {
+		return line1FromY;
+	}
+	public void setLine1FromY(double line1FromY) {
+		this.line1FromY = line1FromY;
+	}
+	public double getLine1ToX() {
+		return line1ToX;
+	}
+	public void setLine1ToX(double line1ToX) {
+		this.line1ToX = line1ToX;
+	}
+	public double getLine1ToY() {
+		return line1ToY;
+	}
+	public void setLine1ToY(double line1ToY) {
+		this.line1ToY = line1ToY;
+	}
+	public double getLine2FromX() {
+		return line2FromX;
+	}
+	public void setLine2FromX(double line2FromX) {
+		this.line2FromX = line2FromX;
+	}
+	public double getLine2FromY() {
+		return line2FromY;
+	}
+	public void setLine2FromY(double line2FromY) {
+		this.line2FromY = line2FromY;
+	}
+	public double getLine2ToX() {
+		return line2ToX;
+	}
+	public void setLine2ToX(double line2ToX) {
+		this.line2ToX = line2ToX;
+	}
+	public double getLine2ToY() {
+		return line2ToY;
+	}
+	public void setLine2ToY(double line2ToY) {
+		this.line2ToY = line2ToY;
+	}
 }
