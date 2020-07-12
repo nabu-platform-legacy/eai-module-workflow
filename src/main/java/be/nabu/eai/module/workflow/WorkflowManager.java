@@ -36,6 +36,7 @@ import be.nabu.libs.resources.api.ResourceContainer;
 import be.nabu.libs.services.api.DefinedService;
 import be.nabu.libs.services.api.DefinedServiceInterface;
 import be.nabu.libs.services.vm.PipelineInterfaceProperty;
+import be.nabu.libs.services.vm.SimpleVMServiceDefinition;
 import be.nabu.libs.services.vm.api.VMService;
 import be.nabu.libs.types.base.ValueImpl;
 import be.nabu.libs.types.structure.DefinedStructure;
@@ -150,18 +151,21 @@ public class WorkflowManager extends JAXBArtifactManager<WorkflowConfiguration, 
 			ResourceContainer<?> services = (ResourceContainer<?>) privateDirectory.getChild("services");
 			if (services != null) {
 				for (Resource child : (ResourceContainer<?>) services) {
+					// make sure we set the pipeline interface property for consistent results
+					WorkflowTransition transition = workflow.getTransitionById(child.getName());
+					WorkflowState fromState = workflow.getTransitionFromState(child.getName());
+					WorkflowTransitionMappingInterface iface = new WorkflowTransitionMappingInterface(workflow, fromState, transition);
+					
 					VMService loaded;
 					try {
-						loaded = new VMServiceManager().load(new WrapperEntry(containerRepository, entry, (ResourceContainer<?>) child, child.getName()), messages);
+						WrapperEntry wrapperEntry = new WrapperEntry(containerRepository, entry, (ResourceContainer<?>) child, child.getName());
+						loaded = new VMServiceManager().load(wrapperEntry, messages);
+						((SimpleVMServiceDefinition) loaded).setId(entry.getId() + ".services." + (iface.isInitial() ? "initial" : "transition") + "." + EAIRepositoryUtils.stringToField(iface.getTransition().getName()));
 					}
 					catch (Exception e) {
 						throw new RuntimeException(e);
 					}
 					
-					// make sure we set the pipeline interface property for consistent results
-					WorkflowTransition transition = workflow.getTransitionById(child.getName());
-					WorkflowState fromState = workflow.getTransitionFromState(child.getName());
-					WorkflowTransitionMappingInterface iface = new WorkflowTransitionMappingInterface(workflow, fromState, transition);
 					loaded.getPipeline().setProperty(new ValueImpl<DefinedServiceInterface>(PipelineInterfaceProperty.getInstance(), iface));
 					
 					workflow.getMappings().put(child.getName(), loaded);
