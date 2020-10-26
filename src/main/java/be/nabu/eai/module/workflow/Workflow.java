@@ -545,7 +545,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 			}
 			
 			WorkflowState targetState = getStateById(transition.getTargetStateId());
-			boolean isFinalState = targetState.getTransitions() == null || targetState.getTransitions().isEmpty();
+			boolean isFinalState = isFinalState(targetState);
 			ComplexContent output;
 			ServiceRuntime serviceRuntime = new ServiceRuntime(transitionService, getRepository().newExecutionContext(token));
 			boolean contextSet = false;
@@ -933,7 +933,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 		// update the workflow to WAITING
 		if (!foundNext) {
 			WorkflowState currentState = getStateById(workflow.getStateId());
-			boolean isFinalState = currentState.getTransitions() == null || currentState.getTransitions().isEmpty();
+			boolean isFinalState = isFinalState(currentState);
 			
 			workflow.setTransitionState(isFinalState ? Level.SUCCEEDED : Level.WAITING);
 			runTransactionally(new TransactionableAction<Void>() {
@@ -1093,10 +1093,29 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 		return initialStates.values();
 	}
 
+	public boolean isFinalState(WorkflowState state) {
+		if (state.getFinalState() != null) {
+			return state.getFinalState();
+		}
+		// if it has transitions, it is not final (by default)
+		if (state.getTransitions() != null && !state.getTransitions().isEmpty()) {
+			return false;
+		}
+		else if (state.getExtensions() != null) {
+			for (String extensionId : state.getExtensions()) {
+				WorkflowState extended = getStateById(extensionId);
+				if (!isFinalState(extended)) {
+					return false;
+				}
+			}
+		}
+		return true;
+	}
+	
 	public Collection<WorkflowState> getFinalStates() {
 		Map<String, WorkflowState> finalStates = new HashMap<String, WorkflowState>();
 		for (WorkflowState state : getConfig().getStates()) {
-			if (state.getTransitions().isEmpty()) {
+			if (isFinalState(state)) {
 				finalStates.put(state.getId(), state);
 			}
 		}

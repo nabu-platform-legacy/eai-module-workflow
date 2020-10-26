@@ -113,8 +113,21 @@ public class WorkflowTransitionServiceInstance implements ServiceInstance {
 			
 			instance = workflowManager.getWorkflow(connectionId, workflowId);
 			
+			if (instance == null) {
+				throw new ServiceException("WORKFLOW-3", "The workflow id is invalid: " + workflowId);
+			}
+			
 			if (!service.getWorkflow().getId().equals(instance.getDefinitionId())) {
 				throw new ServiceException("WORKFLOW-6", "The workflow is not of the correct type, expecting a '" + service.getWorkflow().getId() + "' but received an instance of '" + instance.getDefinitionId() + "'");
+			}
+			
+			// we can not operate on an anonymized instance by default
+			// workflows are sequences of steps that build on state, if we throw away part of that state, it is likely not going to function well anymore
+			// you can't bypass this with force either atm
+			// cause we _could_ allow that, but than every transition afterwards would need to be forced, as the anonymized boolean stays on
+			// so we would have to think on unsetting the boolean? we're gonna wait for an actual usecase
+			if (instance.getAnonymized() != null && instance.getAnonymized()) {
+				throw new ServiceException("WORKFLOW-ANONYMIZED", "Workflow " + workflowId + " is anonymized, you can no longer perform transitions on it");
 			}
 			
 			// a global state can be triggered from anywhere

@@ -731,6 +731,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		states.put(state.getId(), rectangle);
 	}
 	
+	@Deprecated
 	public static class Endpoint {
 		private DoubleExpression x, y;
 
@@ -746,6 +747,8 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		}
 	}
 	
+	// copied to developer utils
+	@Deprecated
 	public static class EndpointPicker {
 		private Endpoint[] possibleBindPoints;
 		private Endpoint endpointToBind;

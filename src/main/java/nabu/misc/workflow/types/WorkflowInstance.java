@@ -9,7 +9,7 @@ import be.nabu.libs.types.api.annotation.ComplexTypeDescriptor;
 import be.nabu.libs.types.api.annotation.Field;
 
 @ComplexTypeDescriptor(collectionName = "WorkflowInstances",
-	propOrder = { "id", "definitionId", "version", "parentId", "batchId", "contextId", "groupId", "correlationId", "workflowType", "uri", "started", "stopped", "environment", "transitionState", "stateId" })
+	propOrder = { "id", "definitionId", "version", "parentId", "batchId", "contextId", "groupId", "correlationId", "workflowType", "uri", "started", "stopped", "environment", "transitionState", "stateId", "anonymized" })
 public class WorkflowInstance {
 	private String id, parentId, definitionId;
 	private Date started, stopped;
@@ -18,6 +18,7 @@ public class WorkflowInstance {
 	private URI uri;
 	// the version of the workflow you are running
 	private Long version;
+	private Boolean anonymized;
 	
 	@Field(primary = true)
 	@NotNull
@@ -147,5 +148,10 @@ public class WorkflowInstance {
 	public void setVersion(Long version) {
 		this.version = version;
 	}
-	
+	public Boolean getAnonymized() {
+		return anonymized;
+	}
+	public void setAnonymized(Boolean anonymized) {
+		this.anonymized = anonymized;
+	}
 }

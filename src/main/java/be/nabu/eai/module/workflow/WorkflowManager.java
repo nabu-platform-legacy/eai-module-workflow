@@ -98,8 +98,11 @@ public class WorkflowManager extends JAXBArtifactManager<WorkflowConfiguration, 
 		if (privateDirectory != null) {
 			ResourceContainer<?> structures = (ResourceContainer<?>) privateDirectory.getChild("structures");
 			if (structures != null) {
+				// structures inside a workflow can have random references to one another (through extension or actual reference or...)
+				// to allow for this, we first load empty definitions into a temporary repository, this will allow us to set all the references correctly
+				// afterwards we parse them one by one
 				for (Resource child : (ResourceContainer<?>) structures) {
-					DefinedStructure loaded = new StructureManager().load(new WrapperEntry(entry.getRepository(), entry, (ResourceContainer<?>) child, child.getName()), messages);
+					DefinedStructure loaded = new DefinedStructure();
 					String group;
 					String name;
 					if (child.getName().equals("properties")) {
@@ -123,6 +126,16 @@ public class WorkflowManager extends JAXBArtifactManager<WorkflowConfiguration, 
 					}
 					loaded.setId(entry.getId() + "." + group + "." + name);
 					workflow.getStructures().put(child.getName(), loaded);
+				}
+				// we then create a temporary repository to allow referencing
+				ContainerRepository containerRepository = new ContainerRepository(entry.getId(), (RepositoryEntry) entry, (Collection<Artifact>) (Collection) workflow.getStructures().values());
+				containerRepository.setExactAliases(true);
+				for (DefinedStructure structure : workflow.getStructures().values()) {
+					containerRepository.alias(entry.getId() + ":" + structure.getId(), structure.getId());
+				}
+				// now we actually parse them!
+				for (Resource child : (ResourceContainer<?>) structures) {
+					new StructureManager().load(new WrapperEntry(containerRepository, entry, (ResourceContainer<?>) child, child.getName()), messages, workflow.getStructures().get(child.getName()));
 				}
 			}
 			// Tricky stuff: the services that do the mapping are based on the documents we dynamically add to state
@@ -254,7 +267,7 @@ public class WorkflowManager extends JAXBArtifactManager<WorkflowConfiguration, 
 			node.setArtifactClass(DefinedStructure.class);
 			node.setArtifact(artifact.getStructures().get(id));
 			node.setLeaf(true);
-			Entry childEntry = new MemoryEntry(parent.getRepository(), directParent, node, directParent.getId() + "." + name, name);
+			Entry childEntry = new MemoryEntry(artifact.getId(), parent.getRepository(), directParent, node, directParent.getId() + "." + name, name);
 			// need to explicitly set id (it was loaded from file)
 			artifact.getStructures().get(id).setId(childEntry.getId());
 			node.setEntry(childEntry);
@@ -289,7 +302,7 @@ public class WorkflowManager extends JAXBArtifactManager<WorkflowConfiguration, 
 				WorkflowTransitionService service = new WorkflowTransitionService(new WorkflowTransitionServiceInterface(artifact, state, transition));
 				node.setArtifact(service);
 				node.setLeaf(true);
-				Entry childEntry = new MemoryEntry(parent.getRepository(), initial, node, service.getId(), service.getName());
+				Entry childEntry = new MemoryEntry(artifact.getId(), parent.getRepository(), initial, node, service.getId(), service.getName());
 				node.setEntry(childEntry);
 				initial.addChildren(childEntry);
 				entries.add(childEntry);
@@ -307,7 +320,7 @@ public class WorkflowManager extends JAXBArtifactManager<WorkflowConfiguration, 
 					WorkflowTransitionService service = new WorkflowTransitionService(new WorkflowTransitionServiceInterface(artifact, state, transition));
 					node.setArtifact(service);
 					node.setLeaf(true);
-					Entry childEntry = new MemoryEntry(parent.getRepository(), transitions, node, service.getId(), service.getName());
+					Entry childEntry = new MemoryEntry(artifact.getId(), parent.getRepository(), transitions, node, service.getId(), service.getName());
 					node.setEntry(childEntry);
 					transitions.addChildren(childEntry);
 					entries.add(childEntry);	

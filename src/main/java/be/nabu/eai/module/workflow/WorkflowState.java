@@ -19,6 +19,9 @@ public class WorkflowState {
 	// nor will it require a force to run it, no matter in which state the workflow is
 	// this is mostly interesting for generic stuff like cancel or for example adding a comment, attachment... something that is always allowed
 	private boolean globalState;
+	// final states are normally calculated
+	// however, you can explicitly choose to mark a state as final (or not final), use with caution
+	private Boolean finalState;
 	
 	public String getId() {
 		return id;
@@ -73,5 +76,10 @@ public class WorkflowState {
 	public void setGlobalState(boolean globalState) {
 		this.globalState = globalState;
 	}
-	
+	public Boolean getFinalState() {
+		return finalState;
+	}
+	public void setFinalState(Boolean finalState) {
+		this.finalState = finalState;
+	}
 }
