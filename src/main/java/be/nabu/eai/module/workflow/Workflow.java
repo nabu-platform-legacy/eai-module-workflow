@@ -276,6 +276,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 			WorkflowProvider.commit(transactionId);
 			return result;
 		}
+		// this "should" differentiate for service exceptions
 		catch (Exception e) {
 			WorkflowProvider.rollback(transactionId);
 			throw new RuntimeException(e);
@@ -396,7 +397,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 			event.setEventName("workflow-transition");
 			event.setAction(transition.getName());
 			event.setCorrelationId(workflow.getId());
-			event.setArtifactId(workflow.getId());
+			event.setArtifactId(getId());
 			event.setCreated(new Date());
 			event.setStarted(event.getCreated());
 			event.setSeverity(EventSeverity.DEBUG);
@@ -712,7 +713,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 						return null;
 					}
 				});
-				throw new ServiceException(e);
+				throw e instanceof ServiceException ? (ServiceException) e : new ServiceException("WORKFLOW-7", "Unexpected exception occured while executing transition", e);
 			}
 			finally {
 				if (contextSet) {
@@ -750,7 +751,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 				throw (RuntimeException) e;
 			}
 			else {
-				throw new ServiceException(e);
+				throw new ServiceException("WORKFLOW-8", "Unexpected exception occured while continuing workflow", e);
 			}
 		}
 	}
@@ -826,10 +827,10 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 			return analyze.evaluate(pipeline);
 		}
 		catch (EvaluationException e) {
-			throw new ServiceException(e);
+			throw new ServiceException("WORKFLOW-9", "Could not evaluate the variable", e);
 		}
 		catch (ParseException e) {
-			throw new ServiceException(e);
+			throw new ServiceException("WORKFLOW-10", "Could not parse the variable query", e);
 		}
 		finally {
 			VariableOperation.unregisterRoot();
