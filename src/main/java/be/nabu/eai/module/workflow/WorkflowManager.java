@@ -303,6 +303,9 @@ public class WorkflowManager extends JAXBArtifactManager<WorkflowConfiguration, 
 				node.setArtifact(service);
 				node.setLeaf(true);
 				Entry childEntry = new MemoryEntry(artifact.getId(), parent.getRepository(), initial, node, service.getId(), service.getName());
+				if (!service.getName().equals(transition.getName())) {
+					node.setName(transition.getName());
+				}
 				node.setEntry(childEntry);
 				initial.addChildren(childEntry);
 				entries.add(childEntry);
@@ -321,6 +324,9 @@ public class WorkflowManager extends JAXBArtifactManager<WorkflowConfiguration, 
 					node.setArtifact(service);
 					node.setLeaf(true);
 					Entry childEntry = new MemoryEntry(artifact.getId(), parent.getRepository(), transitions, node, service.getId(), service.getName());
+					if (!service.getName().equals(transition.getName())) {
+						node.setName(transition.getName());
+					}
 					node.setEntry(childEntry);
 					transitions.addChildren(childEntry);
 					entries.add(childEntry);	
