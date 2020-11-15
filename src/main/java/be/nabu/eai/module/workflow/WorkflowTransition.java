@@ -7,10 +7,15 @@ import javax.xml.bind.annotation.XmlTransient;
 import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 
 import be.nabu.eai.api.Hidden;
+import be.nabu.eai.api.LargeText;
 import be.nabu.libs.services.vm.step.Invoke.KeyValueMapAdapter;
+import be.nabu.libs.types.api.annotation.ComplexTypeDescriptor;
+import be.nabu.libs.types.api.annotation.Field;
 
 // can not directly refer to target state as this may result in circular references!!
 // must refer to the id of the target state, separate resolving
+@ComplexTypeDescriptor(propOrder =  {"id", "name", "targetStateId", "query", "queryOrder", "startBatch", "roles", "permissionContext", "permissionAction", "description", "x", "y", "line1FromX", "line1FromY", "line1ToX", "line1ToY",
+		"line2FromX", "line2FromY", "line2ToX", "line2ToY", "target", "targetProperties" })
 public class WorkflowTransition implements Comparable<WorkflowTransition> {
 	// a generated if for this state
 	private String id;
@@ -54,6 +59,7 @@ public class WorkflowTransition implements Comparable<WorkflowTransition> {
 	public void setName(String name) {
 		this.name = name;
 	}
+	@LargeText
 	public String getDescription() {
 		return description;
 	}
@@ -74,7 +80,7 @@ public class WorkflowTransition implements Comparable<WorkflowTransition> {
 	public void setRoles(List<String> roles) {
 		this.roles = roles;
 	}
-	
+	@Field(comment = "If you set a query, it will be evaluated every time the workflow reaches this state. If the query result to 'true', the transition is automatically executed.")
 	public String getQuery() {
 		return query;
 	}
@@ -94,6 +100,7 @@ public class WorkflowTransition implements Comparable<WorkflowTransition> {
 	public void setY(double y) {
 		this.y = y;
 	}
+	@Field(comment = "The numeric order in which the transition is executed relative to sibling transitions. For every order value, there can only be one transition that moves the workflow to another state.", show = "query != null && query != ''")
 	public int getQueryOrder() {
 		return queryOrder;
 	}
@@ -104,6 +111,7 @@ public class WorkflowTransition implements Comparable<WorkflowTransition> {
 	public int compareTo(WorkflowTransition o) {
 		return queryOrder - o.queryOrder;
 	}
+	@Field(comment = "When you configure a batch on a transition, a new batch id will be generated. You can start multiple new workflows linked to this batch id, the transition will only complete if all batch workflows are finished.")
 	public boolean isStartBatch() {
 		return startBatch;
 	}

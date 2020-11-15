@@ -78,6 +78,7 @@ public class WorkflowRESTListener implements EventHandler<HTTPRequest, HTTPRespo
 			if (!path.startsWith(fullPath)) {
 				return null;
 			}
+			
 			path = path.substring(fullPath.length());
 			
 			WorkflowTransitionService service = null;
@@ -104,6 +105,9 @@ public class WorkflowRESTListener implements EventHandler<HTTPRequest, HTTPRespo
 				return null;
 			}
 			
+			// check offline
+			WebApplicationUtils.checkOffline(application, request);
+						
 			if (service.isInitial() && !"POST".equalsIgnoreCase(request.getMethod())) {
 				throw new HTTPException(404, "Only post allowed for create");
 			}

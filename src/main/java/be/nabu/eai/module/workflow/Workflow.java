@@ -855,7 +855,24 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 				}
 			}
 		}
-		Collections.sort(possibleTransitions);
+		Collections.sort(possibleTransitions, new Comparator<WorkflowTransition>() {
+			@Override
+			public int compare(WorkflowTransition arg0, WorkflowTransition arg1) {
+				// if they are the same query order, transitions that don't alter the state get preference
+				if (arg0.getQueryOrder() == arg1.getQueryOrder()) {
+					if (isSelfTransition(arg0)) {
+						return isSelfTransition(arg1) ? 0 : -1;
+					}
+					else if (isSelfTransition(arg1)) {
+						return 1;
+					}
+					else {
+						return 0;
+					}
+				}
+				return arg0.getQueryOrder() - arg1.getQueryOrder();
+			}
+		});
 		boolean foundNext = false;
 		int queryOrderMatch = -1;
 		for (WorkflowTransition possibleTransition : possibleTransitions) {
@@ -882,7 +899,8 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 				try {
 					if (value != null && value) {
 						// we only ever execute automatic self transitions once, otherwise we can end up in an unending loop or force the user to always validate this themselves
-						if (isSelfTransition(possibleTransition) && hasOccurred(possibleTransition, history)) {
+						boolean selfTransition = isSelfTransition(possibleTransition);
+						if (selfTransition && hasOccurred(possibleTransition, history)) {
 							continue;
 						}
 						queryOrderMatch = possibleTransition.getQueryOrder();
@@ -921,9 +939,12 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 						else {
 							run(connectionId, workflow, history, properties, possibleTransition, token, content);
 						}
-						// we don't allow multiple transitions to be executed anymore, it is impossible in a FSM to have multiple states (if parallel transitions were to go to a different state)
-						// but even if they go to the same state, suppose 1 succeeds and the other fails, did it arrive in that state? do we automatically continue?
-						break;
+						// if it is a self transition, we do allow multiple transitions to be run at the same query order
+						// because it is an FSM, we can't move to another state and execute self transitions afterwards
+						// the sorting should make sure self transitions are run before moving elsewhere
+						if (!selfTransition) {
+							break;
+						}
 					}
 				}
 				catch (Exception e) {

@@ -33,8 +33,12 @@ import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.ScrollPane.ScrollBarPolicy;
 import javafx.scene.control.Separator;
 import javafx.scene.control.SplitPane;
+import javafx.scene.control.Tab;
+import javafx.scene.control.TabPane;
+import javafx.scene.control.TabPane.TabClosingPolicy;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.DataFormat;
 import javafx.scene.input.DragEvent;
@@ -57,6 +61,7 @@ import be.nabu.eai.developer.managers.base.BaseArtifactGUIInstance;
 import be.nabu.eai.developer.managers.base.BaseJAXBGUIManager;
 import be.nabu.eai.developer.managers.util.EnumeratedSimpleProperty;
 import be.nabu.eai.developer.managers.util.MovablePane;
+import be.nabu.eai.developer.managers.util.RootElementWithPush;
 import be.nabu.eai.developer.managers.util.SimpleProperty;
 import be.nabu.eai.developer.managers.util.SimplePropertyUpdater;
 import be.nabu.eai.developer.util.Confirm;
@@ -75,6 +80,8 @@ import be.nabu.eai.repository.api.ModifiableEntry;
 import be.nabu.eai.repository.api.ResourceEntry;
 import be.nabu.eai.repository.resources.RepositoryEntry;
 import be.nabu.jfx.control.line.Line;
+import be.nabu.jfx.control.tree.Refreshable;
+import be.nabu.jfx.control.tree.Tree;
 import be.nabu.jfx.control.tree.TreeItem;
 import be.nabu.jfx.control.tree.drag.MouseLocation;
 import be.nabu.jfx.control.tree.drag.TreeDragDrop;
@@ -90,6 +97,7 @@ import be.nabu.libs.services.vm.api.Step;
 import be.nabu.libs.services.vm.api.VMService;
 import be.nabu.libs.services.vm.step.Sequence;
 import be.nabu.libs.types.SimpleTypeWrapperFactory;
+import be.nabu.libs.types.api.Element;
 import be.nabu.libs.types.base.SimpleElementImpl;
 import be.nabu.libs.types.base.ValueImpl;
 import be.nabu.libs.types.structure.DefinedStructure;
@@ -949,27 +957,16 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		label.setVisible(false);
 		shapes.add(labelPane);
 		
+		Line line1 = new Line();
+		Line line2 = new Line();
+		
 		circle.addEventHandler(MouseEvent.MOUSE_CLICKED, new EventHandler<MouseEvent>() {
 			@Override
 			public void handle(MouseEvent event) {
 				AnchorPane pane = new AnchorPane();
 				try {
-					VMServiceGUIManager serviceManager = new VMServiceGUIManager();
-					serviceManager.setDisablePipelineEditing(true);
-					serviceManager.setActualId(workflow.getId());
-					VMService service = workflow.getMappings().get(transition.getId());
-					VMServiceController controller = serviceManager.displayWithController(MainController.getInstance(), pane, service);
-					TreeItem<Step> root = serviceManager.getServiceTree().rootProperty().get();
-					TreeItem<Step> treeItem = root.getChildren().get(0);
-					serviceManager.getServiceTree().getSelectionModel().select(serviceManager.getServiceTree().getTreeCell(treeItem));
-					Pane panMap = controller.getPanMap();
-					mapPane.getChildren().clear();
-					mapPane.getChildren().add(panMap);
-					
-					AnchorPane.setBottomAnchor(panMap, 0d);
-					AnchorPane.setTopAnchor(panMap, 0d);
-					AnchorPane.setRightAnchor(panMap, 0d);
-					AnchorPane.setLeftAnchor(panMap, 0d);
+					circle.requestFocus();
+					drawTransition(workflow, transition, label, line1, line2);
 					event.consume();
 				}
 				catch (Exception e) {
@@ -999,7 +996,6 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 			}
 		});
 		
-		Line line1 = new Line();
 		line1.eventSizeProperty().set(5);
 		// the line starts at the outgoing point of the state
 		// the picker will intelligently decide which endpoint in the rectangle to bind to
@@ -1047,166 +1043,16 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 			}
 		});
 		
-		Line line2 = new Line();
-		
 		EventHandler<MouseEvent> mouseEventHandler = new EventHandler<MouseEvent>() {
 			@Override
 			public void handle(MouseEvent event) {
-				SplitPane split = new SplitPane();
-				split.setOrientation(Orientation.HORIZONTAL);
-				AnchorPane left = new AnchorPane();
-				AnchorPane right = new AnchorPane();
-				
-				ScrollPane leftScrollPane = new ScrollPane();
-				leftScrollPane.setFitToHeight(true);
-				leftScrollPane.setFitToWidth(true);
-				leftScrollPane.setContent(left);
-				
-				SimplePropertyUpdater createUpdater = EAIDeveloperUtils.createUpdater(transition, new PropertyUpdaterListener() {
-					@Override
-					public boolean updateProperty(Property<?> property, Object value) {
-						if (property.getName().equals("startBatch")) {
-							if (value != null && (Boolean) value) {
-								if (workflow.getMappings().get(transition.getId()).getServiceInterface().getInputDefinition().get("batchId") == null) {
-									Structure input = (Structure) workflow.getMappings().get(transition.getId()).getPipeline().get(Pipeline.INPUT).getType();
-									input.add(new SimpleElementImpl<String>("batchId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input));
-									MainController.getInstance().setChanged();
-								}
-							}
-							else {
-								if (workflow.getMappings().get(transition.getId()).getServiceInterface().getInputDefinition().get("batchId") != null) {
-									Structure input = (Structure) workflow.getMappings().get(transition.getId()).getPipeline().get(Pipeline.INPUT).getType();
-									input.remove(input.get("batchId"));
-									MainController.getInstance().setChanged();
-								}
-							}
-						}
-						if (property.getName().equals("query")) {
-							if (value != null && !((String) value).trim().isEmpty()) {
-								label.setText(transition.getName() + ("true".equals(value) ? "" : "\n" + value));
-								if (!line1.getStyleClass().contains("indexQueryLine")) {
-									line1.getStyleClass().add("indexQueryLine");
-								}
-								if (!line2.getStyleClass().contains("indexQueryLine")) {
-									line2.getStyleClass().add("indexQueryLine");
-								}
-							}
-							else {
-								label.setText(transition.getName());
-								if (line1.getStyleClass().contains("indexQueryLine")) {
-									line1.getStyleClass().remove("indexQueryLine");
-								}
-								if (line2.getStyleClass().contains("indexQueryLine")) {
-									line2.getStyleClass().remove("indexQueryLine");
-								}
-							}
-						}
-						return true;
-					}
-				}, "x", "y", "targetStateId", "id", "name", "target", "targetProperties", "line1FromX", "line1FromY", "line1ToX", "line1ToY", "line2FromX", "line2FromY", "line2ToX", "line2ToY");
-				createUpdater.setSourceId(workflow.getId());
-				MainController.getInstance().showProperties(createUpdater, right, true);
-			
-				split.getItems().addAll(leftScrollPane, right);
-				
-				if (transition.getQuery() != null && !transition.getQuery().trim().toLowerCase().equals("false")) {
-					ExecutorProvider executorProvider = new RepositoryExecutorProvider(workflow.getRepository());
-					AnchorPane additional = new AnchorPane();
-					EnumeratedSimpleProperty<String> targetProperty = new EnumeratedSimpleProperty<String>("target", String.class, false);
-					targetProperty.addAll(executorProvider.getTargets().toArray(new String[0]));
-					HashSet<Property<?>> hashSet = new HashSet<Property<?>>(Arrays.asList(targetProperty));
-					List<Property<?>> targetProperties = new ArrayList<Property<?>>();
-					if (transition.getTarget() != null) {
-						targetProperties.addAll(executorProvider.getTargetProperties(transition.getTarget()));
-						hashSet.addAll(targetProperties);
-					}
-					PropertyUpdater updater = new PropertyUpdater() {
-						@Override
-						public Set<Property<?>> getSupportedProperties() {
-							return hashSet;
-						}
-						@SuppressWarnings({ "unchecked", "rawtypes" })
-						@Override
-						public Value<?>[] getValues() {
-							List<Value<?>> list = new ArrayList<Value<?>>(Arrays.asList(new Value<?> [] { 
-								new ValueImpl<String>(targetProperty, transition.getTarget())
-							}));
-							java.util.Map<String, String> values = transition.getTargetProperties();
-							if (values != null) {
-								for (Property<?> property : targetProperties) {
-									Object value = values.get(property.getName());
-									if (value != null) {
-										if (!String.class.isAssignableFrom(property.getValueClass()) && !((String) value).startsWith("=")) {
-											value = ConverterFactory.getInstance().getConverter().convert(value, property.getValueClass());
-										}
-										list.add(new ValueImpl(property, value));
-									}
-								}
-							}
-							return list.toArray(new Value<?>[list.size()]);
-						}
-						@Override
-						public boolean canUpdate(Property<?> property) {
-							return true;
-						}
-						@Override
-						public List<ValidationMessage> updateProperty(Property<?> property, Object value) {
-							if (property.equals(targetProperty)) {
-								transition.setTarget(value == null ? null : value.toString());
-								hashSet.removeAll(targetProperties);
-								targetProperties.clear();
-								transition.setTargetProperties(null);
-								if (transition.getTarget() != null) {
-									targetProperties.addAll(executorProvider.getTargetProperties(transition.getTarget()));
-									hashSet.addAll(targetProperties);
-								}
-							}
-							else {
-								if (transition.getTargetProperties() == null) {
-									transition.setTargetProperties(new HashMap<String, String>());
-								}
-								if (value == null) {
-									transition.getTargetProperties().remove(property.getName());
-								}
-								else {
-									if (!String.class.isAssignableFrom(property.getValueClass()) && value != null && !(value instanceof String)) {
-										value = ConverterFactory.getInstance().getConverter().convert(value, String.class);
-									}
-									transition.getTargetProperties().put(property.getName(), (String) value);
-								}
-							}
-							MainController.getInstance().setChanged();
-							return null;
-						}
-						@Override
-						public boolean isMandatory(Property<?> property) {
-							return true;
-						}
-					};
-					MainController.getInstance().showProperties(updater, additional, true);
-					split.getItems().add(additional);
-				}
-				
-				mapPane.getChildren().clear();
-				mapPane.getChildren().add(split);
-				// add an editor for the transient state
-				try {
-					StructureGUIManager structureGUIManager = new StructureGUIManager();
-					structureGUIManager.setActualId(workflow.getId());
-					structureGUIManager.display(MainController.getInstance(), left, workflow.getStructures().get(transition.getId()));
-				}
-				catch (Exception e) {
-					throw new RuntimeException(e);
-				}
-				AnchorPane.setLeftAnchor(split, 0d);
-				AnchorPane.setTopAnchor(split, 0d);
-				AnchorPane.setBottomAnchor(split, 0d);
-				AnchorPane.setRightAnchor(split, 0d);
+				drawTransition(workflow, transition, label, line1, line2);
 				
 				// focus on the state for deletion if necessary
 				line1.requestFocus();
 				event.consume();
 			}
+
 		};
 		
 		line1.addEventHandler(MouseEvent.DRAG_DETECTED, new EventHandler<MouseEvent>() {
@@ -1409,5 +1255,227 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 	@Override
 	public String getCategory() {
 		return "Workflow";
+	}
+	
+	private void drawTransition(final Workflow workflow, final WorkflowTransition transition, Label label, Line line1, Line line2) {
+		TabPane tabPane = new TabPane();
+		tabPane.setTabClosingPolicy(TabClosingPolicy.UNAVAILABLE);
+		Tab properties = new Tab("Properties");
+		Tab map = new Tab("Map");
+		Tab target = new Tab("Target");
+		target.setDisable(transition.getQuery() == null || transition.getQuery().trim().isEmpty());
+		tabPane.getTabs().addAll(properties, map, target);
+		
+		SplitPane split = new SplitPane();
+		split.setOrientation(Orientation.HORIZONTAL);
+		VBox left = new VBox();
+		VBox right = new VBox();
+		right.setPadding(new Insets(20));
+		left.setPadding(new Insets(20));
+		
+		Label rightTitle = new Label("Transition Settings");
+		rightTitle.getStyleClass().add("h2");
+		right.getChildren().add(rightTitle);
+		
+		Label leftTitle = new Label("Transition Input");
+		leftTitle.getStyleClass().add("h2");
+		left.getChildren().add(leftTitle);
+		
+		properties.setContent(split);
+		
+		ScrollPane leftScrollPane = new ScrollPane();
+		leftScrollPane.setFitToHeight(true);
+		leftScrollPane.setFitToWidth(true);
+		leftScrollPane.setContent(left);
+		
+		SimplePropertyUpdater createUpdater = EAIDeveloperUtils.createUpdater(transition, new PropertyUpdaterListener() {
+			@Override
+			public boolean updateProperty(Property<?> property, Object value) {
+				if (property.getName().equals("startBatch")) {
+					if (value != null && (Boolean) value) {
+						if (workflow.getMappings().get(transition.getId()).getServiceInterface().getInputDefinition().get("batchId") == null) {
+							Structure input = (Structure) workflow.getMappings().get(transition.getId()).getPipeline().get(Pipeline.INPUT).getType();
+							input.add(new SimpleElementImpl<String>("batchId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input));
+							MainController.getInstance().setChanged();
+						}
+					}
+					else {
+						if (workflow.getMappings().get(transition.getId()).getServiceInterface().getInputDefinition().get("batchId") != null) {
+							Structure input = (Structure) workflow.getMappings().get(transition.getId()).getPipeline().get(Pipeline.INPUT).getType();
+							input.remove(input.get("batchId"));
+							MainController.getInstance().setChanged();
+						}
+					}
+				}
+				if (property.getName().equals("query")) {
+					if (value != null && !((String) value).trim().isEmpty()) {
+						label.setText(transition.getName() + ("true".equals(value) ? "" : "\n" + value));
+						if (!line1.getStyleClass().contains("indexQueryLine")) {
+							line1.getStyleClass().add("indexQueryLine");
+						}
+						if (!line2.getStyleClass().contains("indexQueryLine")) {
+							line2.getStyleClass().add("indexQueryLine");
+						}
+						target.setDisable(false);
+					}
+					else {
+						label.setText(transition.getName());
+						if (line1.getStyleClass().contains("indexQueryLine")) {
+							line1.getStyleClass().remove("indexQueryLine");
+						}
+						if (line2.getStyleClass().contains("indexQueryLine")) {
+							line2.getStyleClass().remove("indexQueryLine");
+						}
+						target.setDisable(true);
+					}
+				}
+				return true;
+			}
+		}, "x", "y", "targetStateId", "id", "name", "target", "targetProperties", "line1FromX", "line1FromY", "line1ToX", "line1ToY", "line2FromX", "line2FromY", "line2ToX", "line2ToY");
+		createUpdater.setSourceId(workflow.getId());
+		VBox rightProperties = new VBox();
+		right.getChildren().add(rightProperties);
+		MainController.getInstance().showProperties(createUpdater, rightProperties, true);
+	
+		split.getItems().addAll(leftScrollPane, right);
+		
+//		if (transition.getQuery() != null && !transition.getQuery().trim().toLowerCase().equals("false")) {
+		
+		
+			ExecutorProvider executorProvider = new RepositoryExecutorProvider(workflow.getRepository());
+			VBox additional = new VBox();
+			additional.setPadding(new Insets(20));
+			Label additionalTitle = new Label("Transition Execution Target");
+			additionalTitle.getStyleClass().add("h2");
+			Label explanation = new Label("When the query is filled in and the transition is automatically triggered, you can choose how it is executed. This works well in combination with the task system.");
+			explanation.setWrapText(true);
+			explanation.getStyleClass().add("p");
+			additional.getChildren().addAll(additionalTitle, explanation);
+			ScrollPane additionalScroll = new ScrollPane();
+			additionalScroll.setContent(additional);
+			additionalScroll.setFitToWidth(true);
+			additionalScroll.setHbarPolicy(ScrollBarPolicy.NEVER);
+			target.setContent(additionalScroll);
+			EnumeratedSimpleProperty<String> targetProperty = new EnumeratedSimpleProperty<String>("target", String.class, false);
+			targetProperty.addAll(executorProvider.getTargets().toArray(new String[0]));
+			HashSet<Property<?>> hashSet = new HashSet<Property<?>>(Arrays.asList(targetProperty));
+			List<Property<?>> targetProperties = new ArrayList<Property<?>>();
+			if (transition.getTarget() != null) {
+				targetProperties.addAll(executorProvider.getTargetProperties(transition.getTarget()));
+				hashSet.addAll(targetProperties);
+			}
+			PropertyUpdater updater = new PropertyUpdater() {
+				@Override
+				public Set<Property<?>> getSupportedProperties() {
+					return hashSet;
+				}
+				@SuppressWarnings({ "unchecked", "rawtypes" })
+				@Override
+				public Value<?>[] getValues() {
+					List<Value<?>> list = new ArrayList<Value<?>>(Arrays.asList(new Value<?> [] { 
+						new ValueImpl<String>(targetProperty, transition.getTarget())
+					}));
+					java.util.Map<String, String> values = transition.getTargetProperties();
+					if (values != null) {
+						for (Property<?> property : targetProperties) {
+							Object value = values.get(property.getName());
+							if (value != null) {
+								if (!String.class.isAssignableFrom(property.getValueClass()) && !((String) value).startsWith("=")) {
+									value = ConverterFactory.getInstance().getConverter().convert(value, property.getValueClass());
+								}
+								list.add(new ValueImpl(property, value));
+							}
+						}
+					}
+					return list.toArray(new Value<?>[list.size()]);
+				}
+				@Override
+				public boolean canUpdate(Property<?> property) {
+					return true;
+				}
+				@Override
+				public List<ValidationMessage> updateProperty(Property<?> property, Object value) {
+					if (property.equals(targetProperty)) {
+						transition.setTarget(value == null ? null : value.toString());
+						hashSet.removeAll(targetProperties);
+						targetProperties.clear();
+						transition.setTargetProperties(null);
+						if (transition.getTarget() != null) {
+							targetProperties.addAll(executorProvider.getTargetProperties(transition.getTarget()));
+							hashSet.addAll(targetProperties);
+						}
+					}
+					else {
+						if (transition.getTargetProperties() == null) {
+							transition.setTargetProperties(new HashMap<String, String>());
+						}
+						if (value == null) {
+							transition.getTargetProperties().remove(property.getName());
+						}
+						else {
+							if (!String.class.isAssignableFrom(property.getValueClass()) && value != null && !(value instanceof String)) {
+								value = ConverterFactory.getInstance().getConverter().convert(value, String.class);
+							}
+							transition.getTargetProperties().put(property.getName(), (String) value);
+						}
+					}
+					MainController.getInstance().setChanged();
+					return null;
+				}
+				@Override
+				public boolean isMandatory(Property<?> property) {
+					return true;
+				}
+			};
+			VBox additionalProperties = new VBox();
+			MainController.getInstance().showProperties(updater, additionalProperties, true);
+			additional.getChildren().add(additionalProperties);
+//		}
+		
+		mapPane.getChildren().clear();
+		mapPane.getChildren().add(tabPane);
+		// add an editor for the transient state
+		try {
+			StructureGUIManager structureGUIManager = new StructureGUIManager();
+			// if someone externally sets an external id, it wins
+			structureGUIManager.setActualId(workflow.getId());
+			Tree<Element<?>> tree = structureGUIManager.display(MainController.getInstance(), left, new RootElementWithPush(workflow.getStructures().get(transition.getId()), true), true, false);
+//			structureGUIManager.display(MainController.getInstance(), left, workflow.getStructures().get(transition.getId()));
+			tree.addRefreshListener(new Refreshable() {
+				@Override
+				public void refresh() {
+					// redraw transition map so it sees the changes
+					drawTransitionMapStep(workflow, transition, map);
+				}
+			});
+		}
+		catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+		AnchorPane.setLeftAnchor(tabPane, 0d);
+		AnchorPane.setTopAnchor(tabPane, 0d);
+		AnchorPane.setBottomAnchor(tabPane, 0d);
+		AnchorPane.setRightAnchor(tabPane, 0d);
+		
+		drawTransitionMapStep(workflow, transition, map);
+	}
+
+	private void drawTransitionMapStep(final Workflow workflow, final WorkflowTransition transition, Tab map) {
+		try {
+			VMServiceGUIManager serviceManager = new VMServiceGUIManager();
+			serviceManager.setDisablePipelineEditing(true);
+			serviceManager.setActualId(workflow.getId());
+			VMService service = workflow.getMappings().get(transition.getId());
+			VBox pane = new VBox();
+			VMServiceController controller = serviceManager.displayWithController(MainController.getInstance(), pane, service);
+			TreeItem<Step> root = serviceManager.getServiceTree().rootProperty().get();
+			TreeItem<Step> treeItem = root.getChildren().get(0);
+			serviceManager.getServiceTree().getSelectionModel().select(serviceManager.getServiceTree().getTreeCell(treeItem));
+			Pane panMap = controller.getPanMap();
+			map.setContent(panMap);
+		}
+		catch (Exception e) {
+			MainController.getInstance().notify(e);
+		}
 	}
 }
