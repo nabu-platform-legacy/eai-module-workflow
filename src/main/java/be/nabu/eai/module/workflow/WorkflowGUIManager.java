@@ -5,6 +5,7 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -17,19 +18,26 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javafx.application.Platform;
 import javafx.beans.binding.DoubleBinding;
 import javafx.beans.binding.DoubleExpression;
 import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.DoubleProperty;
+import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.ReadOnlyDoubleProperty;
+import javafx.beans.property.ReadOnlyObjectProperty;
 import javafx.beans.property.SimpleDoubleProperty;
+import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
 import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
+import javafx.geometry.Point2D;
 import javafx.scene.Node;
 import javafx.scene.Scene;
+import javafx.scene.SnapshotParameters;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
@@ -39,6 +47,7 @@ import javafx.scene.control.SplitPane;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.TabPane.TabClosingPolicy;
+import javafx.scene.image.WritableImage;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.DataFormat;
 import javafx.scene.input.DragEvent;
@@ -75,10 +84,10 @@ import be.nabu.eai.module.types.structure.StructureGUIManager;
 import be.nabu.eai.module.workflow.gui.RectangleWithHooks;
 import be.nabu.eai.module.workflow.transition.WorkflowTransitionMappingInterface;
 import be.nabu.eai.repository.EAIRepositoryUtils;
-import be.nabu.eai.repository.api.Entry;
 import be.nabu.eai.repository.api.ModifiableEntry;
 import be.nabu.eai.repository.api.ResourceEntry;
 import be.nabu.eai.repository.resources.RepositoryEntry;
+import be.nabu.jfx.control.line.CubicCurve;
 import be.nabu.jfx.control.line.Line;
 import be.nabu.jfx.control.tree.Refreshable;
 import be.nabu.jfx.control.tree.Tree;
@@ -172,13 +181,15 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 					MainController.getInstance().setChanged();
 				}
 				else {
-					drawTransition(artifact, state, transition);
+//					drawTransition(artifact, state, transition);
+					drawTransitionCubic(artifact, state, transition);
 				}
 			}
 		}
 		
 		// contains buttons to add actions
 		HBox buttons = new HBox();
+		buttons.setPadding(new Insets(10));
 		
 		Button addState = new Button("Add State");
 		addState.addEventHandler(ActionEvent.ANY, new EventHandler<ActionEvent>() {
@@ -240,8 +251,10 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 				if (!event.isConsumed()) {
 					SplitPane split = new SplitPane();
 					split.setOrientation(Orientation.HORIZONTAL);
-					AnchorPane left = new AnchorPane();
+					VBox left = new VBox();
 					AnchorPane right = new AnchorPane();
+					left.setPadding(new Insets(20));
+					right.setPadding(new Insets(20));
 					
 					ScrollPane leftScrollPane = new ScrollPane();
 					leftScrollPane.setFitToHeight(true);
@@ -255,7 +268,12 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 					try {
 						StructureGUIManager structureGUIManager = new StructureGUIManager();
 						structureGUIManager.setActualId(artifact.getId());
-						structureGUIManager.display(MainController.getInstance(), left, artifact.getStructures().get("properties"));
+						
+						Label leftTitle = new Label("Workflow Properties");
+						leftTitle.getStyleClass().add("h2");
+						VBox leftStructure = new VBox();
+						left.getChildren().addAll(leftTitle, leftStructure);
+						structureGUIManager.display(MainController.getInstance(), leftStructure, artifact.getStructures().get("properties"));
 					}
 					catch (Exception e) {
 						throw new RuntimeException(e);
@@ -265,6 +283,15 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 					AnchorPane.setBottomAnchor(split, 0d);
 					AnchorPane.setRightAnchor(split, 0d);
 				}
+			}
+		});
+		
+		Button export = new Button("Copy to clipboard (PNG)");
+		export.addEventHandler(ActionEvent.ANY, new EventHandler<ActionEvent>() {
+			@Override
+			public void handle(ActionEvent arg0) {
+				WritableImage snapshot = drawPane.snapshot(new SnapshotParameters(), null);
+				MainController.copy(snapshot);
 			}
 		});
 		
@@ -302,7 +329,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 			}
 		});
 		
-		buttons.getChildren().addAll(addState, editProperties, separator, dragModeMove, dragModeConnect, dragModeExtend);
+		buttons.getChildren().addAll(addState, editProperties, export, separator, dragModeMove, dragModeConnect, dragModeExtend);
 		
 		drawScrollPane = new ScrollPane();
 		drawScrollPane.setContent(drawPane);
@@ -381,8 +408,11 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 				lastStateId = state.getId();
 				SplitPane split = new SplitPane();
 				split.setOrientation(Orientation.HORIZONTAL);
-				AnchorPane left = new AnchorPane();
-				AnchorPane right = new AnchorPane();
+				VBox left = new VBox();
+				VBox right = new VBox();
+				
+				left.setPadding(new Insets(20));
+				right.setPadding(new Insets(20));
 				
 				ScrollPane leftScrollPane = new ScrollPane();
 				leftScrollPane.setFitToHeight(true);
@@ -401,7 +431,11 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 				// TODO: extensions should really be enumerated and should persist ids instead of names...
 				SimplePropertyUpdater createUpdater = EAIDeveloperUtils.createUpdater(state, null, "x", "y", "transitions.*", "id", "name", "extensions");
 				createUpdater.setSourceId(workflow.getId());
-				MainController.getInstance().showProperties(createUpdater, right, true);
+				Label rightLabel = new Label("State Settings");
+				rightLabel.getStyleClass().add("h2");
+				VBox rightProperties = new VBox();
+				right.getChildren().addAll(rightLabel, rightProperties);
+				MainController.getInstance().showProperties(createUpdater, rightProperties, true);
 			
 				split.getItems().addAll(leftScrollPane, right);
 				mapPane.getChildren().clear();
@@ -410,6 +444,9 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 				try {
 					StructureGUIManager structureGUIManager = new StructureGUIManager();
 					structureGUIManager.setActualId(workflow.getId());
+					Label leftLabel = new Label("State Input");
+					leftLabel.getStyleClass().add("h2");
+					left.getChildren().add(leftLabel);
 					structureGUIManager.display(MainController.getInstance(), left, workflow.getStructures().get(state.getId()));
 				}
 				catch (Exception e) {
@@ -565,6 +602,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 									transition.setName(name);
 									
 									for (WorkflowState child : workflow.getConfig().getStates()) {
+										// reset per state
 										if (child.getId().equals(content)) {
 											child.getTransitions().add(transition);
 	
@@ -615,7 +653,14 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 											service.getRoot().getChildren().add(map);
 											
 											workflow.getMappings().put(transition.getId(), service);
-											drawTransition(workflow, child, transition);
+//											drawTransition(workflow, child, transition);
+											
+											if (workflow.isSelfTransition(transition)) {
+												redrawState(workflow, child);
+											}
+											else {
+												drawTransitionCubic(workflow, child, transition);
+											}
 										}
 									}
 									MainController.getInstance().setChanged();
@@ -655,14 +700,23 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 					if (transition != null) {
 						WorkflowState originState = workflow.getTransitionFromState(transition.getId());
 						if (originState != null && !originState.equals(state)) {
+							boolean redrawOriginState = workflow.isSelfTransition(transition);
 							undrawTransition(transition);
 							originState.getTransitions().remove(transition);
-							MainController.getInstance().setChanged();
 							if (state.getTransitions() == null) {
 								state.setTransitions(new ArrayList<WorkflowTransition>());
 							}
 							state.getTransitions().add(transition);
-							drawTransition(workflow, state, transition);
+							if (redrawOriginState) {
+								redrawState(workflow, originState);
+							}
+							if (workflow.isSelfTransition(transition)) {
+								redrawState(workflow, state);
+							}
+							else {
+								drawTransitionCubic(workflow, state, transition);
+							}
+							MainController.getInstance().setChanged();
 						}
 					}
 				}
@@ -671,9 +725,21 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 					if (transition != null && !transition.getTargetStateId().equals(state.getId())) {
 						WorkflowState originState = workflow.getTransitionFromState(transition.getId());
 						if (originState != null) {
+							// if it's a self transition before we update, we need to redraw the full origin state
+							boolean redrawOriginState = workflow.isSelfTransition(transition);
+							// always undraw the transition
 							undrawTransition(transition);
 							transition.setTargetStateId(state.getId());
-							drawTransition(workflow, originState, transition);
+							// check that it maybe _became_ a self transition
+							redrawOriginState |= workflow.isSelfTransition(transition);
+							// redraw the rest of the state as well so other self transitions are ordered/visualized correctly
+							if (redrawOriginState) {
+								redrawState(workflow, originState);
+							}
+							else {
+								drawTransitionCubic(workflow, originState, transition);
+							}
+							MainController.getInstance().setChanged();
 						}
 					}
 				}
@@ -698,12 +764,16 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 						if (shape instanceof Line) {
 							shape.getStyleClass().add("connectionLine-hover");
 						}
-						else if (shape instanceof AnchorPane) {
-							for (Node child : ((AnchorPane) shape).getChildren()) {
-								if (child instanceof Label) {
-									child.setVisible(true);
-								}
-							}
+//						else if (shape instanceof AnchorPane) {
+//							for (Node child : ((AnchorPane) shape).getChildren()) {
+//								if (child instanceof Label) {
+//									child.setVisible(true);
+//								}
+//							}
+//						}
+						else if (shape.getStyleClass().contains("transition-name")) {
+							shape.setVisible(true);
+							shape.toFront();
 						}
 					}
 					states.get(transition.getTargetStateId()).getContent().getStyleClass().add("active-to");
@@ -719,12 +789,15 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 						if (shape instanceof Line) {
 							shape.getStyleClass().remove("connectionLine-hover");
 						}
-						else if (shape instanceof AnchorPane) {
-							for (Node child : ((AnchorPane) shape).getChildren()) {
-								if (child instanceof Label) {
-									child.setVisible(false);
-								}
-							}
+//						else if (shape instanceof AnchorPane) {
+//							for (Node child : ((AnchorPane) shape).getChildren()) {
+//								if (child instanceof Label) {
+//									child.setVisible(false);
+//								}
+//							}
+//						}
+						else if (shape.getStyleClass().contains("transition-name")) {
+							shape.setVisible(false);
 						}
 					}
 					states.get(transition.getTargetStateId()).getContent().getStyleClass().remove("active-to");
@@ -739,7 +812,17 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		states.put(state.getId(), rectangle);
 	}
 	
-	@Deprecated
+	private void redrawState(Workflow workflow, WorkflowState state) {
+		if (state.getTransitions() != null) {
+			for (WorkflowTransition transition : state.getTransitions()) {
+				undrawTransition(transition);
+			}
+			for (WorkflowTransition transition : state.getTransitions()) {
+				drawTransitionCubic(workflow, state, transition);
+			}
+		}
+	}
+	
 	public static class Endpoint {
 		private DoubleExpression x, y;
 
@@ -756,12 +839,11 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 	}
 	
 	// copied to developer utils
-	@Deprecated
 	public static class EndpointPicker {
 		private Endpoint[] possibleBindPoints;
 		private Endpoint endpointToBind;
 		
-		private Endpoint lastWinner;
+		private ObjectProperty<Endpoint> lastWinner = new SimpleObjectProperty<Endpoint>();
 		
 		private SimpleDoubleProperty x = new SimpleDoubleProperty();
 		private SimpleDoubleProperty y = new SimpleDoubleProperty();
@@ -800,7 +882,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 					minDistance = distance;
 				}
 			}
-			if (lastWinner == null || !lastWinner.equals(winner)) {
+			if (lastWinner.get() == null || !lastWinner.get().equals(winner)) {
 				if (x.isBound()) {
 					x.unbind();
 				}
@@ -809,7 +891,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 					y.unbind();
 				}
 				y.bind(winner.yProperty());
-				lastWinner = winner;
+				lastWinner.set(winner);
 			}
 		}
 		
@@ -818,6 +900,9 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		}
 		public ReadOnlyDoubleProperty yProperty() {
 			return y;
+		}
+		public ReadOnlyObjectProperty<Endpoint> pointProperty() {
+			return lastWinner;
 		}
 	}
 	
@@ -904,6 +989,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		
 		AnchorPane pane = new AnchorPane();
 		VBox box = new VBox();
+		
 		Circle circle = new Circle(5);
 		circle.getStyleClass().add("connectionLine");
 		circle.setFill(Color.TRANSPARENT);
@@ -1201,6 +1287,331 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		drawPane.getChildren().addAll(arrow1);
 		drawPane.getChildren().addAll(arrow2);
 	}
+	
+	private static class XDecider {
+		private DoubleProperty x1 = new SimpleDoubleProperty(), x2 = new SimpleDoubleProperty();
+		private ReadOnlyDoubleProperty sourceX, targetX;
+		
+		public XDecider(ReadOnlyDoubleProperty sourceX, ReadOnlyDoubleProperty targetX) {
+			this.sourceX = sourceX;
+			this.targetX = targetX;
+			calculate();
+			sourceX.addListener(new ChangeListener<Number>() {
+				@Override
+				public void changed(ObservableValue<? extends Number> arg0, Number arg1, Number arg2) {
+					calculate();
+				}
+			});
+			targetX.addListener(new ChangeListener<Number>() {
+				@Override
+				public void changed(ObservableValue<? extends Number> arg0, Number arg1, Number arg2) {
+					calculate();
+				}
+			});
+		}
+		
+		private void calculate() {
+			x1.set(Math.max(sourceX.get() + 150, sourceX.get() + ((targetX.get() - sourceX.get()) * 0.3)));
+			x2.set(Math.min(targetX.get() - 150, sourceX.get() + ((targetX.get() - sourceX.get()) * 0.7)));
+		}
+	}
+	
+	public static class CubicControlDecider {
+		private EndpointPicker picker;
+		private RectangleWithHooks rectangle;
+		private DoubleProperty x = new SimpleDoubleProperty(), y = new SimpleDoubleProperty();
+
+		public CubicControlDecider(EndpointPicker picker, RectangleWithHooks rectangle) {
+			this.picker = picker;
+			this.rectangle = rectangle;
+			initialize();
+		}
+		
+		private void initialize() {
+			picker.pointProperty().addListener(new ChangeListener<Endpoint>() {
+				@Override
+				public void changed(ObservableValue<? extends Endpoint> arg0, Endpoint arg1, Endpoint arg2) {
+					pickWinner(arg2);
+				}
+			});
+			pickWinner(picker.pointProperty().get());
+		}
+		private void pickWinner(Endpoint point) {
+			x.unbind();
+			y.unbind();
+			// bottom one
+			int offset = 50;
+			if (point.xProperty().get() == rectangle.bottomAnchorXProperty().get() && point.yProperty().get() == rectangle.bottomAnchorYProperty().get()) {
+				x.bind(point.xProperty());
+				y.bind(point.yProperty().add(offset));
+			}
+			else if (point.xProperty().get() == rectangle.topAnchorXProperty().get() && point.yProperty().get() == rectangle.topAnchorYProperty().get()) {
+				x.bind(point.xProperty());
+				y.bind(point.yProperty().subtract(offset));
+			}
+			else if (point.xProperty().get() == rectangle.leftAnchorXProperty().get() && point.yProperty().get() == rectangle.leftAnchorYProperty().get()) {
+				x.bind(point.xProperty().subtract(offset));
+				y.bind(point.yProperty());
+			}
+			else if (point.xProperty().get() == rectangle.rightAnchorXProperty().get() && point.yProperty().get() == rectangle.rightAnchorYProperty().get()) {
+				x.bind(point.xProperty().add(offset));
+				y.bind(point.yProperty());
+			}
+		}
+	}
+		
+	// in the frontend we don't have cubic lines yet, it is still based on the two-line approach from before
+	// to stay backwards compatible, we use the halfway position of the curve as a "point" and pretend that there are two lines!
+	private void synchronizeCubicTransition(WorkflowTransition transition, CubicCurve curve) {
+		transition.setLine1FromX(curve.getStartX());
+		transition.setLine1FromY(curve.getStartY());
+		Point2D point = EAIDeveloperUtils.getPositionOnCurve(curve, 0.5f);
+		transition.setLine1ToX(point.getX());
+		transition.setLine1ToY(point.getY());
+		transition.setLine2FromX(point.getX());
+		transition.setLine2FromY(point.getY());
+		transition.setLine2ToX(curve.getEndX());
+		transition.setLine2ToY(curve.getEndY());
+	}
+	
+	private void positionLabel(VBox pane, Label label, CubicCurve curve) {
+		Point2D point = EAIDeveloperUtils.getPositionOnCurve(curve, 0.5f);
+		pane.setLayoutX(point.getX() - 50);
+		// for self transitions we want slightly more offset so the label don't overlap
+		pane.setLayoutY(point.getY());
+	}
+	
+	private void drawTransitionCubic(final Workflow workflow, final WorkflowState state, final WorkflowTransition transition) {
+		List<Node> shapes = new ArrayList<Node>();
+		
+		AnchorPane pane = new AnchorPane();
+		
+		VBox labelPane = new VBox();
+//		labelPane.setManaged(false);
+		Label label = new Label(transition.getName());
+		labelPane.getChildren().add(label);
+		
+		if (transition.getQuery() != null && !transition.getQuery().trim().isEmpty() && !transition.getQuery().trim().equals("true")) {
+			Label label2 = new Label(transition.getQuery());
+			label2.getStyleClass().add("transition-query");
+//			label.setText(label.getText() + ("true".equals(transition.getQuery()) ? "" : "\n" + transition.getQuery()));
+			labelPane.getChildren().add(label2);
+		}
+		labelPane.getStyleClass().add("transition-name");
+		
+		labelPane.setVisible(false);
+		// prevent flickering when it pops up under your mouse
+		labelPane.setMouseTransparent(true);
+		// if you use long names...it's on you! we don't want self transitions to overlap vertically
+//		label.setMaxWidth(150);
+		label.setWrapText(true);
+		shapes.add(labelPane);
+
+		BooleanProperty locked = MainController.getInstance().hasLock(workflow.getId());
+		
+		CubicCurve line = new CubicCurve();
+		line.eventSizeProperty().set(5);
+		boolean selfTransition = workflow.isSelfTransition(transition);
+
+		// when redrawing, the label position is...off
+		// do it later to get the correct position
+		Platform.runLater(new Runnable() {
+			@Override
+			public void run() {
+				positionLabel(labelPane, label, line);
+			}
+		});
+		
+		// synchronize positions that change over time
+		ChangeListener<Number> positionChangeListener = new ChangeListener<Number>() {
+			@Override
+			public void changed(ObservableValue<? extends Number> arg0, Number arg1, Number arg2) {
+				synchronizeCubicTransition(transition, line);
+				positionLabel(labelPane, label, line);
+			}
+		};
+		line.startXProperty().addListener(positionChangeListener);
+		line.startYProperty().addListener(positionChangeListener);
+		line.endXProperty().addListener(positionChangeListener);
+		line.endYProperty().addListener(positionChangeListener);
+		
+		int selfPosition = 0;
+		int totalSelfs = 0;
+		// instead of "just" calculating the indexed position, get all the transitions, do a sort based on query order and use the resulting index
+		// that way they are sorted in the order of execution
+		if (selfTransition) {
+			List<WorkflowTransition> selfTransitions = new ArrayList<WorkflowTransition>();
+			for (WorkflowTransition single : state.getTransitions()) {
+				if (transition.equals(single)) {
+					selfTransitions.add(single);
+					selfPosition = totalSelfs;
+					totalSelfs++;
+				}
+				else if (workflow.isSelfTransition(single)) {
+					selfTransitions.add(single);
+					totalSelfs++;
+				}
+			}
+			// sort on query order
+			Collections.sort(selfTransitions);
+			selfPosition = selfTransitions.indexOf(transition);
+			totalSelfs = selfTransitions.size();
+		}
+		
+		// not a self transition!
+		if (!selfTransition) {
+			// the line starts at the outgoing point of the state
+			// the picker will intelligently decide which endpoint in the rectangle to bind to
+			EndpointPicker startPicker = getPicker(line.endXProperty(), line.endYProperty(), states.get(state.getId()));
+			line.startXProperty().bind(startPicker.xProperty());
+			line.startYProperty().bind(startPicker.yProperty());
+			
+			EndpointPicker endPicker = getPicker(line.startXProperty(), line.startYProperty(), states.get(transition.getTargetStateId()));
+			line.endXProperty().bind(endPicker.xProperty());
+			line.endYProperty().bind(endPicker.yProperty());
+			
+			CubicControlDecider startDecider = new CubicControlDecider(startPicker, states.get(state.getId()));
+			line.controlX1Property().bind(startDecider.x);
+			line.controlY1Property().bind(startDecider.y);
+			
+			CubicControlDecider endDecider = new CubicControlDecider(endPicker, states.get(transition.getTargetStateId()));
+			line.controlX2Property().bind(endDecider.x);
+			line.controlY2Property().bind(endDecider.y);
+		}
+		// for selfies, we do other shizzle
+		else {
+			RectangleWithHooks hooks = states.get(state.getId());
+			// from oneself
+			line.startXProperty().bind(hooks.bottomAnchorXProperty());
+			line.startYProperty().bind(hooks.bottomAnchorYProperty());
+			// to oneself
+			line.endXProperty().bind(hooks.bottomAnchorXProperty());
+			line.endYProperty().bind(hooks.bottomAnchorYProperty());
+			
+			int transitionDistance = 50;
+			// we leave 50px between each transition, depending on the amount, we need to start leftish
+			// for 1 transition, we want straight down (no x deviation)
+			// for 2 transitions we want one on the left, one on the right (-25 and +25)
+			// for 3 transitions we want one on the left, one in the middle, one on the right (-50, 0, 50)
+			// for 4 transitions we want one on the left, one in the middle, one on the right (-75, -25, 25, 75)
+			// the maximum offset + the offset for this one
+			int offsetX = (int) ((Math.floor(totalSelfs / 2) * (-transitionDistance / 2)) + (selfPosition * transitionDistance)); 
+			// we subtract an additional 25 for the controls
+			line.controlX1Property().bind(hooks.bottomAnchorXProperty().add(offsetX - 25));
+			line.controlY1Property().bind(hooks.bottomAnchorYProperty().add(100 + (selfPosition * 50)));
+			line.controlX2Property().bind(hooks.bottomAnchorXProperty().add(offsetX + 25));
+			line.controlY2Property().bind(hooks.bottomAnchorYProperty().add(100 + (selfPosition * 50)));
+		}
+		
+		EventHandler<MouseEvent> mouseEventHandler = new EventHandler<MouseEvent>() {
+			@Override
+			public void handle(MouseEvent event) {
+				drawTransition(workflow, transition, label, line, null);
+				
+				// focus on the state for deletion if necessary
+				line.requestFocus();
+				event.consume();
+			}
+
+		};
+		
+		line.addEventHandler(MouseEvent.DRAG_DETECTED, new EventHandler<MouseEvent>() {
+			@Override
+			public void handle(MouseEvent event) {
+				Dragboard dragboard = line.startDragAndDrop(TransferMode.MOVE);
+				ClipboardContent clipboard = new ClipboardContent();
+				
+
+				// we calculate the distance to the control point, this will indicate whether you are doing the first bit or the second (also for self transitions!)
+//				double d1 = EAIDeveloperUtils.getDistance(new Point2D(event.getX(), event.getY()), new Point2D(line.getControlX1(), line.getControlY1()));
+//				double d2 = EAIDeveloperUtils.getDistance(new Point2D(event.getX(), event.getY()), new Point2D(line.getControlX2(), line.getControlY2()));
+				
+				// the control points are not correct for self-transitions as the lines are usually under an angle
+				// at that angle and the control points so close to the center, the direct distances are not valid!
+				// instead we take a position on the curve which works in all circumstances
+				Point2D from = EAIDeveloperUtils.getPositionOnCurve(line, 0.2f);
+				Point2D to = EAIDeveloperUtils.getPositionOnCurve(line, 0.8f);
+				double d1 = EAIDeveloperUtils.getDistance(new Point2D(event.getX(), event.getY()), from);
+				double d2 = EAIDeveloperUtils.getDistance(new Point2D(event.getX(), event.getY()), to);
+				System.out.println("distances are: " + d1 + ", " + d2);
+				// if you are closer to control 1, we assume you want to change the from
+				if (d1 < d2) {
+					clipboard.put(TreeDragDrop.getDataFormat("workflow-transition-from"), transition.getId());
+				}
+				// otherwise, we assume you want to change the to
+				else {
+					clipboard.put(TreeDragDrop.getDataFormat("workflow-transition-to"), transition.getId());
+				}
+				dragboard.setContent(clipboard);
+			}
+		});
+		
+		line.addEventHandler(MouseEvent.MOUSE_CLICKED, mouseEventHandler);
+		
+		EventHandler<KeyEvent> keyEventHandler = new EventHandler<KeyEvent>() {
+			@Override
+			public void handle(KeyEvent event) {
+				if (event.getCode() == KeyCode.DELETE && locked.get()) {
+					Confirm.confirm(ConfirmType.QUESTION, "Delete transition?", "Are you sure you want to delete the transition '" + transition.getName() + "'", new EventHandler<ActionEvent>() {
+						@Override
+						public void handle(ActionEvent arg0) {
+							removeTransition(workflow, state, transition);
+						}
+					});
+				}
+			}
+		};
+		line.addEventHandler(KeyEvent.KEY_PRESSED, keyEventHandler);
+		
+		line.getStyleClass().add("connectionLine");
+		line.setFill(null);
+		
+		if (transition.getQuery() != null) {
+			line.getStyleClass().add("indexQueryLine");
+		}
+		
+//		XDecider decider = new XDecider(line.startXProperty(), line.endXProperty());
+//		line.controlX1Property().bind(decider.x1);
+//		line.controlX2Property().bind(decider.x2);
+//		line.controlY1Property().bind(line.startYProperty());
+//		line.controlY2Property().bind(line.endYProperty());
+		
+		shapes.add(line);
+		
+		List<Shape> drawArrow = EAIDeveloperUtils.drawArrow(line, selfTransition ? 0.25f : 0.5f, true);
+		shapes.addAll(drawArrow);
+		
+//		List<Shape> arrow1 = EAIDeveloperUtils.drawArrow(line1, 0.5);
+//		shapes.addAll(arrow1);
+//		List<Shape> arrow2 = EAIDeveloperUtils.drawArrow(line2, 0.5);
+//		shapes.addAll(arrow2);
+		
+		EventHandler<MouseEvent> highlightStates = new EventHandler<MouseEvent>() {
+			@Override
+			public void handle(MouseEvent arg0) {
+				states.get(state.getId()).getContent().getStyleClass().add("active-from");
+				states.get(transition.getTargetStateId()).getContent().getStyleClass().add("active-to");
+				line.getStyleClass().add("connectionLine-hover");
+				labelPane.setVisible(true);
+				labelPane.toFront();
+			}
+		};
+		EventHandler<MouseEvent> unhighlightStates = new EventHandler<MouseEvent>() {
+			@Override
+			public void handle(MouseEvent arg0) {
+				states.get(state.getId()).getContent().getStyleClass().remove("active-from");
+				states.get(transition.getTargetStateId()).getContent().getStyleClass().remove("active-to");
+				line.getStyleClass().remove("connectionLine-hover");
+				labelPane.setVisible(false);
+			}
+		};
+		line.addEventHandler(MouseEvent.MOUSE_ENTERED, highlightStates);
+		line.addEventHandler(MouseEvent.MOUSE_EXITED, unhighlightStates);
+		
+		transitions.put(transition.getId(), shapes);
+		drawPane.getChildren().addAll(line, pane, labelPane);
+		drawPane.getChildren().addAll(drawArrow);
+	}
 
 	private static EndpointPicker getPicker(ReadOnlyDoubleProperty x, ReadOnlyDoubleProperty y, AnchorPane pane, Circle circle) {
 		Endpoint endpoint = new Endpoint(x, y);
@@ -1227,15 +1638,15 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 
 	// currently we don't support detaching cause the mouse drawing is limited with the movable panes linked to the scenes
 	// in theory we can group on something else than the scene, but we need a generic drop listener on the whole scene just to be sure?
-	@Override
-	protected BaseArtifactGUIInstance<Workflow> newGUIInstance(Entry entry) {
-		return new BaseArtifactGUIInstance<Workflow>(this, entry) {
-			@Override
-			public boolean isDetachable() {
-				return false;
-			}
-		};
-	}
+//	@Override
+//	protected BaseArtifactGUIInstance<Workflow> newGUIInstance(Entry entry) {
+//		return new BaseArtifactGUIInstance<Workflow>(this, entry) {
+//			@Override
+//			public boolean isDetachable() {
+//				return false;
+//			}
+//		};
+//	}
 
 	@Override
 	protected void setEntry(BaseArtifactGUIInstance<Workflow> guiInstance, ResourceEntry entry) {
@@ -1257,7 +1668,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		return "Workflow";
 	}
 	
-	private void drawTransition(final Workflow workflow, final WorkflowTransition transition, Label label, Line line1, Line line2) {
+	private void drawTransition(final Workflow workflow, final WorkflowTransition transition, Label label, Node line1, Node line2) {
 		TabPane tabPane = new TabPane();
 		tabPane.setTabClosingPolicy(TabClosingPolicy.UNAVAILABLE);
 		Tab properties = new Tab("Properties");
@@ -1310,20 +1721,20 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 				if (property.getName().equals("query")) {
 					if (value != null && !((String) value).trim().isEmpty()) {
 						label.setText(transition.getName() + ("true".equals(value) ? "" : "\n" + value));
-						if (!line1.getStyleClass().contains("indexQueryLine")) {
+						if (line1 != null && !line1.getStyleClass().contains("indexQueryLine")) {
 							line1.getStyleClass().add("indexQueryLine");
 						}
-						if (!line2.getStyleClass().contains("indexQueryLine")) {
+						if (line2 != null && !line2.getStyleClass().contains("indexQueryLine")) {
 							line2.getStyleClass().add("indexQueryLine");
 						}
 						target.setDisable(false);
 					}
 					else {
 						label.setText(transition.getName());
-						if (line1.getStyleClass().contains("indexQueryLine")) {
+						if (line1 != null && line1.getStyleClass().contains("indexQueryLine")) {
 							line1.getStyleClass().remove("indexQueryLine");
 						}
-						if (line2.getStyleClass().contains("indexQueryLine")) {
+						if (line2 != null && line2.getStyleClass().contains("indexQueryLine")) {
 							line2.getStyleClass().remove("indexQueryLine");
 						}
 						target.setDisable(true);

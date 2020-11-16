@@ -109,6 +109,10 @@ public class WorkflowTransition implements Comparable<WorkflowTransition> {
 	}
 	@Override
 	public int compareTo(WorkflowTransition o) {
+		if (queryOrder == o.queryOrder) {
+			// do alphabetic if order is the same
+			return name.compareToIgnoreCase(o.getName());
+		}
 		return queryOrder - o.queryOrder;
 	}
 	@Field(comment = "When you configure a batch on a transition, a new batch id will be generated. You can start multiple new workflows linked to this batch id, the transition will only complete if all batch workflows are finished.")

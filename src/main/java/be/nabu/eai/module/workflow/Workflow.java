@@ -28,6 +28,7 @@ import org.slf4j.LoggerFactory;
 
 import be.nabu.eai.module.services.jdbc.RepositoryDataSourceResolver;
 import be.nabu.eai.module.services.vm.RepositoryExecutorProvider;
+import be.nabu.eai.module.web.application.MountableWebFragmentProvider;
 import be.nabu.eai.module.web.application.WebApplication;
 import be.nabu.eai.module.web.application.WebFragment;
 import be.nabu.eai.module.web.application.api.RESTFragment;
@@ -101,7 +102,7 @@ import be.nabu.utils.cep.impl.ComplexEventImpl;
 // so basically get the old definition, add it (like the current workflow) to the repository but in a subfolder like "v3"
 // we can then access all the document types & transitions and run it (best effort)
 // if there are dependencies missing or modified to work differently, this can not be helped (but the same is true for classic BPMN)
-public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements WebFragment, RESTFragmentProvider {
+public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements MountableWebFragmentProvider { // RESTFragmentProvider
 
 	private Logger logger = LoggerFactory.getLogger(getClass());
 	
@@ -973,7 +974,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 		}
 	}
 	
-	private boolean isSelfTransition(WorkflowTransition transition) {
+	public boolean isSelfTransition(WorkflowTransition transition) {
 		for (WorkflowState state : getConfig().getStates()) {
 			// if it starts from this state and goes back to this state, it is a self transition
 			if (state.getTransitions() != null && state.getTransitions().contains(transition)) {
@@ -1174,133 +1175,150 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Web
 	
 	/******************************* WEB FRAGMENT *******************************/
 	
-	private Map<String, List<EventSubscription<?, ?>>> subscriptions = new HashMap<String, List<EventSubscription<?, ?>>>();
-	
-	private String getKey(WebApplication artifact, String path) {
-		return artifact.getId() + ":" + path;
-	}
-	
-	@Override
-	public void start(WebApplication artifact, String path) throws IOException {
-		String key = getKey(artifact, path);
-		if (subscriptions.containsKey(key)) {
-			stop(artifact, path);
-		}
-		
-		String fullPath = artifact.getServerPath();
-		if (path != null && !path.isEmpty() && !path.equals("/")) {
-			if (!fullPath.endsWith("/")) {
-				fullPath += "/";
-			}
-			fullPath += path.replaceFirst("^[/]+", "");
-		}
-		if (!fullPath.endsWith("/")) {
-			fullPath += "/";
-		}
-		EventDispatcher dispatcher = artifact.getConfiguration().getVirtualHost().getDispatcher();
-		// we want to send the full path without base path here as the getPath() in the workflow transition service includes the base path
-		EventSubscription<HTTPRequest, HTTPResponse> subscription = dispatcher.subscribe(HTTPRequest.class, new WorkflowRESTListener(artifact, this, Charset.defaultCharset(), null, fullPath));
-		// to filter, we want to add the base path as well
-		if (getConfig().getBasePath() != null) {
-			fullPath += getConfig().getBasePath();
-			fullPath = fullPath.replaceAll("[/]{2,}", "/");
-		}
-		subscription.filter(HTTPServerUtils.limitToPath(fullPath));
-		
-		List<EventSubscription<?, ?>> list = subscriptions.get(key);
-		if (list == null) {
-			list = new ArrayList<EventSubscription<?, ?>>();
-			synchronized(subscriptions) {
-				subscriptions.put(key, list);
-			}
-		}
-		list.add(subscription);
-	}
+//	private Map<String, List<EventSubscription<?, ?>>> subscriptions = new HashMap<String, List<EventSubscription<?, ?>>>();
+//	
+//	private String getKey(WebApplication artifact, String path) {
+//		return artifact.getId() + ":" + path;
+//	}
+//	
+//	@Override
+//	public void start(WebApplication artifact, String path) throws IOException {
+//		String key = getKey(artifact, path);
+//		if (subscriptions.containsKey(key)) {
+//			stop(artifact, path);
+//		}
+//		
+//		String fullPath = artifact.getServerPath();
+//		if (path != null && !path.isEmpty() && !path.equals("/")) {
+//			if (!fullPath.endsWith("/")) {
+//				fullPath += "/";
+//			}
+//			fullPath += path.replaceFirst("^[/]+", "");
+//		}
+//		if (!fullPath.endsWith("/")) {
+//			fullPath += "/";
+//		}
+//		EventDispatcher dispatcher = artifact.getConfiguration().getVirtualHost().getDispatcher();
+//		// we want to send the full path without base path here as the getPath() in the workflow transition service includes the base path
+//		EventSubscription<HTTPRequest, HTTPResponse> subscription = dispatcher.subscribe(HTTPRequest.class, new WorkflowRESTListener(artifact, this, Charset.defaultCharset(), null, fullPath));
+//		// to filter, we want to add the base path as well
+//		if (getConfig().getBasePath() != null) {
+//			fullPath += getConfig().getBasePath();
+//			fullPath = fullPath.replaceAll("[/]{2,}", "/");
+//		}
+//		subscription.filter(HTTPServerUtils.limitToPath(fullPath));
+//		
+//		List<EventSubscription<?, ?>> list = subscriptions.get(key);
+//		if (list == null) {
+//			list = new ArrayList<EventSubscription<?, ?>>();
+//			synchronized(subscriptions) {
+//				subscriptions.put(key, list);
+//			}
+//		}
+//		list.add(subscription);
+//	}
+//
+//	@Override
+//	public void stop(WebApplication artifact, String path) {
+//		String key = getKey(artifact, path);
+//		if (subscriptions.containsKey(key)) {
+//			synchronized(subscriptions) {
+//				if (subscriptions.containsKey(key)) {
+//					for (EventSubscription<?, ?> subscription : subscriptions.get(key)) {
+//						subscription.unsubscribe();
+//					}
+//					subscriptions.remove(key);
+//				}
+//			}
+//		}
+//	}
+//
+//	@Override
+//	public List<Permission> getPermissions(WebApplication artifact, String path) {
+//		return new ArrayList<Permission>();
+//	}
+//
+//	@Override
+//	public boolean isStarted(WebApplication artifact, String path) {
+//		return subscriptions.containsKey(getKey(artifact, path));
+//	}
+
+//	@Override
+//	public List<RESTFragment> getFragments(boolean limitToUser, Token token) {
+//		List<RESTFragment> fragments = new ArrayList<RESTFragment>();
+//		if (getConfig().getStates() != null) {
+//			Collection<WorkflowState> initialStates = getInitialStates();
+//			for (WorkflowState state : getConfig().getStates()) {
+//				boolean isInitial = initialStates.contains(state);
+//				for (WorkflowTransition transition : state.getTransitions()) {
+//					String cleanName = EAIRepositoryUtils.stringToField(transition.getName());
+//					String serviceId = getId() + ".services." + (isInitial ? "initial" : "transition") + "." + cleanName;
+//					WorkflowTransitionService service = (WorkflowTransitionService) getRepository().resolve(serviceId);
+//					if (service == null) {
+//						throw new IllegalStateException("Can not find the service: "  + serviceId);
+//					}
+//					fragments.add(new RESTFragment() {
+//						@Override
+//						public String getId() {
+//							return service.getId();
+//						}
+//						@Override
+//						public String getPath() {
+//							return Workflow.this.getId() + "/" + cleanName;
+//						}
+//						@Override
+//						public String getMethod() {
+//							return isInitial ? "POST" : "PUT";
+//						}
+//						@Override
+//						public List<String> getConsumes() {
+//							return Arrays.asList("application/json", "application/xml");
+//						}
+//						@Override
+//						public List<String> getProduces() {
+//							return Arrays.asList("application/json", "application/xml");
+//						}
+//						@Override
+//						public Type getInput() {
+//							return service.getServiceInterface().getInputDefinition();
+//						}
+//						@Override
+//						public Type getOutput() {
+//							return service.getServiceInterface().getOutputDefinition();
+//						}
+//						@Override
+//						public List<Element<?>> getQueryParameters() {
+//							return new ArrayList<Element<?>>();
+//						}
+//						@Override
+//						public List<Element<?>> getHeaderParameters() {
+//							return new ArrayList<Element<?>>();
+//						}
+//						@Override
+//						public List<Element<?>> getPathParameters() {
+//							return new ArrayList<Element<?>>();
+//						}
+//					});
+//				}
+//			}
+//		}
+//		return fragments;
+//	}
 
 	@Override
-	public void stop(WebApplication artifact, String path) {
-		String key = getKey(artifact, path);
-		if (subscriptions.containsKey(key)) {
-			synchronized(subscriptions) {
-				if (subscriptions.containsKey(key)) {
-					for (EventSubscription<?, ?> subscription : subscriptions.get(key)) {
-						subscription.unsubscribe();
-					}
-					subscriptions.remove(key);
-				}
-			}
-		}
-	}
-
-	@Override
-	public List<Permission> getPermissions(WebApplication artifact, String path) {
-		return new ArrayList<Permission>();
-	}
-
-	@Override
-	public boolean isStarted(WebApplication artifact, String path) {
-		return subscriptions.containsKey(getKey(artifact, path));
-	}
-
-	@Override
-	public List<RESTFragment> getFragments(boolean limitToUser, Token token) {
-		List<RESTFragment> fragments = new ArrayList<RESTFragment>();
-		if (getConfig().getStates() != null) {
-			Collection<WorkflowState> initialStates = getInitialStates();
-			for (WorkflowState state : getConfig().getStates()) {
-				boolean isInitial = initialStates.contains(state);
-				for (WorkflowTransition transition : state.getTransitions()) {
-					String cleanName = EAIRepositoryUtils.stringToField(transition.getName());
-					String serviceId = getId() + ".services." + (isInitial ? "initial" : "transition") + "." + cleanName;
-					WorkflowTransitionService service = (WorkflowTransitionService) getRepository().resolve(serviceId);
-					if (service == null) {
-						throw new IllegalStateException("Can not find the service: "  + serviceId);
-					}
-					fragments.add(new RESTFragment() {
-						@Override
-						public String getId() {
-							return service.getId();
-						}
-						@Override
-						public String getPath() {
-							return Workflow.this.getId() + "/" + cleanName;
-						}
-						@Override
-						public String getMethod() {
-							return isInitial ? "POST" : "PUT";
-						}
-						@Override
-						public List<String> getConsumes() {
-							return Arrays.asList("application/json", "application/xml");
-						}
-						@Override
-						public List<String> getProduces() {
-							return Arrays.asList("application/json", "application/xml");
-						}
-						@Override
-						public Type getInput() {
-							return service.getServiceInterface().getInputDefinition();
-						}
-						@Override
-						public Type getOutput() {
-							return service.getServiceInterface().getOutputDefinition();
-						}
-						@Override
-						public List<Element<?>> getQueryParameters() {
-							return new ArrayList<Element<?>>();
-						}
-						@Override
-						public List<Element<?>> getHeaderParameters() {
-							return new ArrayList<Element<?>>();
-						}
-						@Override
-						public List<Element<?>> getPathParameters() {
-							return new ArrayList<Element<?>>();
-						}
-					});
-				}
+	public List<WebFragment> getWebFragments() {
+		List<WebFragment> fragments = new ArrayList<WebFragment>();
+		for (DefinedService service : getRepository().getArtifacts(DefinedService.class)) {
+			if (service.getId().startsWith(getId() + ".") && service instanceof WebFragment) {
+				fragments.add((WebFragment) service);
 			}
 		}
 		return fragments;
 	}
+
+	@Override
+	public String getRelativePath() {
+		return "/";
+	}
+
 }

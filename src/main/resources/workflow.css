@@ -37,6 +37,20 @@
 	-fx-padding: 12px 6px 6px 6px;
 	-fx-text-alignment: center;
 }
+.transition-name {
+	-fx-padding: 6px;
+	-fx-text-alignment: center;
+	-fx-background-color: -theme-primary-light;
+	-fx-border-color: -theme-primary;
+	-fx-font-color: -theme-primary-text;
+	-fx-border-radius: 3px;
+	-fx-background-radius: 3px;
+	-fx-font-size: 0.9em;
+}
+.transition-query {
+	-fx-font-size: 0.8em;
+	-fx-font-color: -theme-primary-text-unfocused;
+}
 
 .active-from {
 	-fx-background-color: #f2fff2;

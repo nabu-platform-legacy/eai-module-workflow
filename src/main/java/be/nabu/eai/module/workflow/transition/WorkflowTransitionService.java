@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import be.nabu.eai.api.NamingConvention;
 import be.nabu.eai.module.web.application.WebApplication;
 import be.nabu.eai.module.web.application.WebFragment;
 import be.nabu.eai.module.web.application.api.RESTFragment;
@@ -143,10 +144,14 @@ public class WorkflowTransitionService implements DefinedService, WebFragment, R
 
 	@Override
 	public String getPath() {
-		String cleanName = EAIRepositoryUtils.stringToField(getName());
+		String cleanName = NamingConvention.LOWER_CAMEL_CASE.apply(NamingConvention.UNDERSCORE.apply(getName()));
 		String basePath = getWorkflow().getConfig().getBasePath();
 		if (basePath == null) {
-			basePath = getWorkflow().getId();
+			// we are assuming the workflow has a unique enough name so we can (by default) generate clean rest services
+			// you can always set a base path if you don't agree
+			// could also add "workflow/" to the front of it to make it more specific, but that's an implementation detail really, it shouldn't bleed through to the swagger
+			basePath = getWorkflow().getId().replaceAll("^.*\\.([^.]+)$", "$1");
+//			basePath = getWorkflow().getId().replace(".", "/");
 		}
 		else if (basePath.equals("/")) {
 			basePath = null;
