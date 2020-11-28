@@ -14,11 +14,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javafx.application.Platform;
+import javafx.beans.binding.Bindings;
 import javafx.beans.binding.DoubleBinding;
 import javafx.beans.binding.DoubleExpression;
 import javafx.beans.property.BooleanProperty;
@@ -254,7 +256,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 					VBox left = new VBox();
 					AnchorPane right = new AnchorPane();
 					left.setPadding(new Insets(20));
-					right.setPadding(new Insets(20));
+//					right.setPadding(new Insets(20));
 					
 					ScrollPane leftScrollPane = new ScrollPane();
 					leftScrollPane.setFitToHeight(true);
@@ -655,12 +657,15 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 											workflow.getMappings().put(transition.getId(), service);
 //											drawTransition(workflow, child, transition);
 											
-											if (workflow.isSelfTransition(transition)) {
-												redrawState(workflow, child);
-											}
-											else {
-												drawTransitionCubic(workflow, child, transition);
-											}
+//											if (workflow.isSelfTransition(transition)) {
+//												redrawState(workflow, child);
+//											}
+//											else {
+//												drawTransitionCubic(workflow, child, transition);
+//											}
+											// redraw everything...
+											redrawState(workflow, child);
+											redrawState(workflow, state);
 										}
 									}
 									MainController.getInstance().setChanged();
@@ -714,7 +719,10 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 								redrawState(workflow, state);
 							}
 							else {
-								drawTransitionCubic(workflow, state, transition);
+//								drawTransitionCubic(workflow, state, transition);
+								// because we now do transition ordering based on similar transitions, we need to redraw everything!
+								redrawState(workflow, state);
+								redrawState(workflow, workflow.getStateById(transition.getTargetStateId()));
 							}
 							MainController.getInstance().setChanged();
 						}
@@ -737,7 +745,10 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 								redrawState(workflow, originState);
 							}
 							else {
-								drawTransitionCubic(workflow, originState, transition);
+//								drawTransitionCubic(workflow, originState, transition);
+								// because we now do transition ordering based on similar transitions, we need to redraw everything!
+								redrawState(workflow, state);
+								redrawState(workflow, originState);
 							}
 							MainController.getInstance().setChanged();
 						}
@@ -1316,17 +1327,36 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		}
 	}
 	
+	public static class CubicAngleOffsetDecider {
+		private Endpoint from;
+		private Endpoint to;
+		private int offset;
+
+		public CubicAngleOffsetDecider(Endpoint from, Endpoint to, int offset) {
+			this.from = from;
+			this.to = to;
+			this.offset = offset;
+			initialize();
+		}
+		private void initialize() {
+			
+		}
+	}
+	
 	public static class CubicControlDecider {
 		private EndpointPicker picker;
 		private RectangleWithHooks rectangle;
 		private DoubleProperty x = new SimpleDoubleProperty(), y = new SimpleDoubleProperty();
+		private int additionalOffset;
+		private CubicCurve curve;
 
-		public CubicControlDecider(EndpointPicker picker, RectangleWithHooks rectangle) {
+		public CubicControlDecider(CubicCurve curve, EndpointPicker picker, RectangleWithHooks rectangle, int additionalOffset) {
+			this.curve = curve;
 			this.picker = picker;
 			this.rectangle = rectangle;
+			this.additionalOffset = additionalOffset;
 			initialize();
 		}
-		
 		private void initialize() {
 			picker.pointProperty().addListener(new ChangeListener<Endpoint>() {
 				@Override
@@ -1336,26 +1366,63 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 			});
 			pickWinner(picker.pointProperty().get());
 		}
+		
 		private void pickWinner(Endpoint point) {
 			x.unbind();
 			y.unbind();
-			// bottom one
-			int offset = 50;
+			
+			// for example if we have the right anchor, the "to" state is to the right of the "from" state
+			// we use the angle between the two points to see how they relate to one another
+			// at 0 and 90 degrees, we want 0 offset, at 45 degrees we want maximum offset
+			DoubleBinding angleBinding = Bindings.createDoubleBinding(new Callable<Double>() {
+				@Override
+				public Double call() throws Exception {
+					// is expressed in degrees
+					double angle = new Point2D(curve.getEndX(), curve.getEndY()).angle(curve.getStartX(), curve.getStartY());
+					
+					double xDiff = curve.getEndX() - curve.getStartX();
+					double yDiff = curve.getEndY() - curve.getStartY();
+					angle = Math.toDegrees(Math.atan2(yDiff, xDiff));
+					// abs it
+					if (angle < 0) {
+						angle += 360;
+					}
+					double remainder = angle % 90;
+
+					// the closer you are to 45 degrees, the bigger the offset, the further away, the lesser
+					double result = Math.abs(45 - remainder);
+					// make it percent based
+					if (result != 0) {
+						result /= 45;
+					}
+					return result * additionalOffset;
+				}
+			}, curve.startXProperty(), curve.startYProperty(), curve.endXProperty(), curve.endYProperty());
+			
+			
+			// the distance from the origin point
+			int offset = 50 + additionalOffset;
 			if (point.xProperty().get() == rectangle.bottomAnchorXProperty().get() && point.yProperty().get() == rectangle.bottomAnchorYProperty().get()) {
-				x.bind(point.xProperty());
+//				x.bind(point.xProperty().add(additionalOffset));
+				x.bind(point.xProperty().add(angleBinding));
 				y.bind(point.yProperty().add(offset));
 			}
 			else if (point.xProperty().get() == rectangle.topAnchorXProperty().get() && point.yProperty().get() == rectangle.topAnchorYProperty().get()) {
-				x.bind(point.xProperty());
+//				x.bind(point.xProperty().subtract(additionalOffset));
+				x.bind(point.xProperty().subtract(angleBinding));
 				y.bind(point.yProperty().subtract(offset));
 			}
 			else if (point.xProperty().get() == rectangle.leftAnchorXProperty().get() && point.yProperty().get() == rectangle.leftAnchorYProperty().get()) {
+				
 				x.bind(point.xProperty().subtract(offset));
-				y.bind(point.yProperty());
+//				y.bind(point.yProperty().subtract(additionalOffset));
+				y.bind(point.yProperty().subtract(angleBinding));
 			}
 			else if (point.xProperty().get() == rectangle.rightAnchorXProperty().get() && point.yProperty().get() == rectangle.rightAnchorYProperty().get()) {
+				
 				x.bind(point.xProperty().add(offset));
-				y.bind(point.yProperty());
+//				y.bind(point.yProperty().add(additionalOffset));
+				y.bind(point.yProperty().add(angleBinding));
 			}
 		}
 	}
@@ -1436,27 +1503,65 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		line.endYProperty().addListener(positionChangeListener);
 		
 		int selfPosition = 0;
-		int totalSelfs = 0;
+		int totalSimilar = 0;
+		// we want to get the position of the transition if there are multiple transitions along the same path
 		// instead of "just" calculating the indexed position, get all the transitions, do a sort based on query order and use the resulting index
 		// that way they are sorted in the order of execution
-		if (selfTransition) {
-			List<WorkflowTransition> selfTransitions = new ArrayList<WorkflowTransition>();
-			for (WorkflowTransition single : state.getTransitions()) {
-				if (transition.equals(single)) {
-					selfTransitions.add(single);
-					selfPosition = totalSelfs;
-					totalSelfs++;
-				}
-				else if (workflow.isSelfTransition(single)) {
-					selfTransitions.add(single);
-					totalSelfs++;
+		List<WorkflowTransition> similarTransitions = new ArrayList<WorkflowTransition>();
+		// get all the transitions that end in the same state
+		for (WorkflowTransition single : state.getTransitions()) {
+			if (transition.equals(single)) {
+				similarTransitions.add(single);
+				selfPosition = totalSimilar;
+				totalSimilar++;
+			}
+			else if (transition.getTargetStateId().equals(single.getTargetStateId())) {
+				similarTransitions.add(single);
+				totalSimilar++;
+			}
+		}
+		boolean reverseOffset = false;
+		// sort on query order
+		Collections.sort(similarTransitions);
+		// if it is not a self transition, we also need all the transitions going the other way
+		if (!workflow.isSelfTransition(transition)) {
+			List<WorkflowTransition> similarReverseTransitions = new ArrayList<WorkflowTransition>();
+			WorkflowState stateById = workflow.getStateById(transition.getTargetStateId());
+			if (stateById != null && stateById.getTransitions() != null) {
+				for (WorkflowTransition single : stateById.getTransitions()) {
+					if (single.getTargetStateId().equals(state.getId())) {
+						similarReverseTransitions.add(single);
+						totalSimilar++;
+					}
 				}
 			}
 			// sort on query order
-			Collections.sort(selfTransitions);
-			selfPosition = selfTransitions.indexOf(transition);
-			totalSelfs = selfTransitions.size();
+			Collections.sort(similarReverseTransitions);
+			// if both states looked at it from their own perspective, their list of transitions would be first, indexes would overlap
+			// we assume the higher up in the list the state, the earlier it was drawn, it is more likely to have the first drawn transitions
+			if (workflow.getConfig().getStates().indexOf(state) < workflow.getConfig().getStates().indexOf(stateById)) {
+				similarTransitions.addAll(similarReverseTransitions);
+			}
+			else {
+				similarReverseTransitions.addAll(similarTransitions);
+				similarTransitions = similarReverseTransitions;
+				reverseOffset = true;
+			}
 		}
+		// get new stats
+		selfPosition = similarTransitions.indexOf(transition);
+		totalSimilar = similarTransitions.size();
+
+		// the distance between transitions
+		int transitionDistance = 50;
+		// we leave 50px between each transition, depending on the amount, we need to start leftish (for self transitions, others whatever path they take)
+		// for 1 transition, we want straight down (no x deviation)
+		// for 2 transitions we want one on the left, one on the right (-25 and +25)
+		// for 3 transitions we want one on the left, one in the middle, one on the right (-50, 0, 50)
+		// for 4 transitions we want one on the left, one in the middle, one on the right (-75, -25, 25, 75)
+		// the maximum offset + the offset for this one
+		int transitionOffset = (int) ((Math.floor(totalSimilar / 2) * (-transitionDistance / 2)) + (selfPosition * transitionDistance));
+		int invertedTransitionOffset = (int) (Math.floor(totalSimilar / 2) * (transitionDistance / 2)) - transitionOffset;
 		
 		// not a self transition!
 		if (!selfTransition) {
@@ -1470,11 +1575,14 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 			line.endXProperty().bind(endPicker.xProperty());
 			line.endYProperty().bind(endPicker.yProperty());
 			
-			CubicControlDecider startDecider = new CubicControlDecider(startPicker, states.get(state.getId()));
+			// only offset the first control, if we offset both, the lines criss-cross
+			// we use the current inverted / normal transition offset so the transitions from the "first" state to the second are on top
+			CubicControlDecider startDecider = new CubicControlDecider(line, startPicker, states.get(state.getId()), reverseOffset ? invertedTransitionOffset : transitionOffset);
 			line.controlX1Property().bind(startDecider.x);
 			line.controlY1Property().bind(startDecider.y);
 			
-			CubicControlDecider endDecider = new CubicControlDecider(endPicker, states.get(transition.getTargetStateId()));
+			// reverse the offset so we have clean lines
+			CubicControlDecider endDecider = new CubicControlDecider(line, endPicker, states.get(transition.getTargetStateId()), reverseOffset ? transitionOffset : invertedTransitionOffset);
 			line.controlX2Property().bind(endDecider.x);
 			line.controlY2Property().bind(endDecider.y);
 		}
@@ -1488,18 +1596,10 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 			line.endXProperty().bind(hooks.bottomAnchorXProperty());
 			line.endYProperty().bind(hooks.bottomAnchorYProperty());
 			
-			int transitionDistance = 50;
-			// we leave 50px between each transition, depending on the amount, we need to start leftish
-			// for 1 transition, we want straight down (no x deviation)
-			// for 2 transitions we want one on the left, one on the right (-25 and +25)
-			// for 3 transitions we want one on the left, one in the middle, one on the right (-50, 0, 50)
-			// for 4 transitions we want one on the left, one in the middle, one on the right (-75, -25, 25, 75)
-			// the maximum offset + the offset for this one
-			int offsetX = (int) ((Math.floor(totalSelfs / 2) * (-transitionDistance / 2)) + (selfPosition * transitionDistance)); 
 			// we subtract an additional 25 for the controls
-			line.controlX1Property().bind(hooks.bottomAnchorXProperty().add(offsetX - 25));
+			line.controlX1Property().bind(hooks.bottomAnchorXProperty().add(transitionOffset - 25));
 			line.controlY1Property().bind(hooks.bottomAnchorYProperty().add(100 + (selfPosition * 50)));
-			line.controlX2Property().bind(hooks.bottomAnchorXProperty().add(offsetX + 25));
+			line.controlX2Property().bind(hooks.bottomAnchorXProperty().add(transitionOffset + 25));
 			line.controlY2Property().bind(hooks.bottomAnchorYProperty().add(100 + (selfPosition * 50)));
 		}
 		
