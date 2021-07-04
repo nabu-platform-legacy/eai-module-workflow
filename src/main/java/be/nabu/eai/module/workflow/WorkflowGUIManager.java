@@ -1430,9 +1430,9 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 	// in the frontend we don't have cubic lines yet, it is still based on the two-line approach from before
 	// to stay backwards compatible, we use the halfway position of the curve as a "point" and pretend that there are two lines!
 	private void synchronizeCubicTransition(WorkflowTransition transition, CubicCurve curve) {
+		Point2D point = EAIDeveloperUtils.getPositionOnCurve(curve, 0.5f);
 		transition.setLine1FromX(curve.getStartX());
 		transition.setLine1FromY(curve.getStartY());
-		Point2D point = EAIDeveloperUtils.getPositionOnCurve(curve, 0.5f);
 		transition.setLine1ToX(point.getX());
 		transition.setLine1ToY(point.getY());
 		transition.setLine2FromX(point.getX());
@@ -1956,7 +1956,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 				@Override
 				public void refresh() {
 					// redraw transition map so it sees the changes
-					drawTransitionMapStep(workflow, transition, map);
+					drawTransitionMapStep(workflow, transition, map, tabPane);
 				}
 			});
 		}
@@ -1968,10 +1968,10 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		AnchorPane.setBottomAnchor(tabPane, 0d);
 		AnchorPane.setRightAnchor(tabPane, 0d);
 		
-		drawTransitionMapStep(workflow, transition, map);
+		drawTransitionMapStep(workflow, transition, map, tabPane);
 	}
 
-	private void drawTransitionMapStep(final Workflow workflow, final WorkflowTransition transition, Tab map) {
+	private void drawTransitionMapStep(final Workflow workflow, final WorkflowTransition transition, Tab map, TabPane tabPane) {
 		try {
 			VMServiceGUIManager serviceManager = new VMServiceGUIManager();
 			serviceManager.setDisablePipelineEditing(true);
@@ -1983,6 +1983,22 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 			TreeItem<Step> treeItem = root.getChildren().get(0);
 			serviceManager.getServiceTree().getSelectionModel().select(serviceManager.getServiceTree().getTreeCell(treeItem));
 			Pane panMap = controller.getPanMap();
+			
+			// we bound this to the tab pane that is no longer visible!
+			panMap.maxWidthProperty().unbind();
+			panMap.maxHeightProperty().unbind();
+			panMap.prefWidthProperty().unbind();
+			panMap.prefHeightProperty().unbind();
+			panMap.minWidthProperty().unbind();
+			panMap.minHeightProperty().unbind();
+			
+			panMap.maxHeightProperty().bind(tabPane.heightProperty().subtract(30));
+			panMap.maxWidthProperty().bind(tabPane.widthProperty());
+			panMap.prefHeightProperty().bind(tabPane.heightProperty().subtract(30));
+			panMap.prefWidthProperty().bind(tabPane.widthProperty());
+			panMap.minHeightProperty().bind(tabPane.heightProperty().subtract(30));
+			panMap.minWidthProperty().bind(tabPane.widthProperty());
+			
 			map.setContent(panMap);
 		}
 		catch (Exception e) {

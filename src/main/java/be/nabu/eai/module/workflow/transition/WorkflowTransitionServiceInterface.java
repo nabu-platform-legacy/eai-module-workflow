@@ -15,10 +15,12 @@ import be.nabu.libs.types.TypeUtils;
 import be.nabu.libs.types.api.ComplexType;
 import be.nabu.libs.types.api.Element;
 import be.nabu.libs.types.base.ComplexElementImpl;
+import be.nabu.libs.types.base.Scope;
 import be.nabu.libs.types.base.SimpleElementImpl;
 import be.nabu.libs.types.base.ValueImpl;
 import be.nabu.libs.types.properties.CommentProperty;
 import be.nabu.libs.types.properties.MinOccursProperty;
+import be.nabu.libs.types.properties.ScopeProperty;
 import be.nabu.libs.types.structure.Structure;
 
 public class WorkflowTransitionServiceInterface implements DefinedServiceInterface {
@@ -44,24 +46,31 @@ public class WorkflowTransitionServiceInterface implements DefinedServiceInterfa
 					if (input == null) {
 						Structure input = new Structure();
 						input.setName("input");
-						input.add(new SimpleElementImpl<String>("connectionId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
+						input.add(new SimpleElementImpl<String>("connectionId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0),
+							new ValueImpl<Scope>(ScopeProperty.getInstance(), Scope.PRIVATE)));
 						if (!isInitial) {
 							input.add(new SimpleElementImpl<String>("workflowId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input));
 							// a global state can be called from anywhere, force and besteffort have no power here
 							if (!fromState.isGlobalState()) {
-								input.add(new SimpleElementImpl<Boolean>("force", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(Boolean.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "If the workflow is not in the correct state, do you still want to trigger this transition? This is especially interesting for forcing a retry at a specific state.")));
-								input.add(new SimpleElementImpl<Boolean>("bestEffort", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(Boolean.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "If the workflow is not in the correct state, do you want an exception or just leave it? This is especially interesting for timed transitions that are used as a fallback.")));
+								input.add(new SimpleElementImpl<Boolean>("force", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(Boolean.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "If the workflow is not in the correct state, do you still want to trigger this transition? This is especially interesting for forcing a retry at a specific state."),
+									new ValueImpl<Scope>(ScopeProperty.getInstance(), Scope.PRIVATE)));
+								input.add(new SimpleElementImpl<Boolean>("bestEffort", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(Boolean.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "If the workflow is not in the correct state, do you want an exception or just leave it? This is especially interesting for timed transitions that are used as a fallback."),
+									new ValueImpl<Scope>(ScopeProperty.getInstance(), Scope.PRIVATE)));
 							}
 						}
 						else {
-							input.add(new SimpleElementImpl<String>("workflowId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "A pregenerated id for the workflow")));
-							input.add(new SimpleElementImpl<String>("parentId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "The id of the parent workflow")));
-							input.add(new SimpleElementImpl<String>("batchId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "The id of the batch it belongs to")));
+							input.add(new SimpleElementImpl<String>("workflowId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "A pregenerated id for the workflow"),
+								new ValueImpl<Scope>(ScopeProperty.getInstance(), Scope.PRIVATE)));
+							input.add(new SimpleElementImpl<String>("parentId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "The id of the parent workflow"),
+								new ValueImpl<Scope>(ScopeProperty.getInstance(), Scope.PRIVATE)));
+							input.add(new SimpleElementImpl<String>("batchId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "The id of the batch it belongs to"),
+								new ValueImpl<Scope>(ScopeProperty.getInstance(), Scope.PRIVATE)));
 							input.add(new SimpleElementImpl<String>("correlationId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "A free to choose correlation id that can link this workflow to something else")));
 							input.add(new SimpleElementImpl<String>("contextId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "A contextually relevant id for this instance of the workflow, for example an invoice number")));
 							input.add(new SimpleElementImpl<String>("groupId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "The contextually relevant group id for this instance of the workflow, for example a customer id")));
 							input.add(new SimpleElementImpl<String>("workflowType", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "The contextually relevant type of this workflow instance, for example a message type")));
-							input.add(new SimpleElementImpl<URI>("uri", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(URI.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "A lot of workflows revolve around data, if this is the case, log the uri for the relevant data here")));
+							input.add(new SimpleElementImpl<URI>("uri", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(URI.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "A lot of workflows revolve around data, if this is the case, log the uri for the relevant data here"),
+								new ValueImpl<Scope>(ScopeProperty.getInstance(), Scope.PRIVATE)));
 						}
 						ComplexType stateType = (ComplexType) getRepository().resolve(workflow.getId() + ".types.states." + EAIRepositoryUtils.stringToField(fromState.getName()));
 						if (stateType != null && !TypeUtils.getAllChildren(stateType).isEmpty()) {

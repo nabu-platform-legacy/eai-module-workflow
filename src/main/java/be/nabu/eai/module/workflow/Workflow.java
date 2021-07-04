@@ -360,6 +360,8 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Mou
 			if (transition != null) {
 				String serviceId = getId() + ".services.transition" + "." + EAIRepositoryUtils.stringToField(transition.getName());
 				DefinedService transitionService = (DefinedService) getRepository().resolve(serviceId);
+				// can not retry initial transitions! this would create a new workflow? need another mechanism for that...
+				// can still run it probably? just not directly on the service
 				if (transitionService != null) {
 					ComplexType inputDefinition = transitionService.getServiceInterface().getInputDefinition();
 					// if there are no input parameters for this service, we can run it
@@ -901,7 +903,10 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Mou
 					if (value != null && value) {
 						// we only ever execute automatic self transitions once, otherwise we can end up in an unending loop or force the user to always validate this themselves
 						boolean selfTransition = isSelfTransition(possibleTransition);
-						if (selfTransition && hasOccurred(possibleTransition, history)) {
+						// by default self transitions can not repeat, normal transitions can repeat
+						boolean canRepeat = possibleTransition.getAllowMultipleAutomaticExecutions() != null ? possibleTransition.getAllowMultipleAutomaticExecutions()
+							: !selfTransition;
+						if (!canRepeat && hasOccurred(possibleTransition, history)) {
 							continue;
 						}
 						queryOrderMatch = possibleTransition.getQueryOrder();

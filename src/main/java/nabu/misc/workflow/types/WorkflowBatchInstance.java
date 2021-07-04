@@ -2,6 +2,8 @@ package nabu.misc.workflow.types;
 
 import java.util.Date;
 
+import javax.validation.constraints.NotNull;
+
 import be.nabu.libs.types.api.annotation.ComplexTypeDescriptor;
 import be.nabu.libs.types.api.annotation.Field;
 import nabu.misc.workflow.types.WorkflowInstance.Level;
@@ -17,6 +19,7 @@ public class WorkflowBatchInstance {
 	// the state of the batch
 	private Level state;
 	
+	@NotNull
 	@Field(primary = true)
 	public String getId() {
 		return id;
@@ -24,12 +27,14 @@ public class WorkflowBatchInstance {
 	public void setId(String id) {
 		this.id = id;
 	}
+	@NotNull
 	public String getWorkflowId() {
 		return workflowId;
 	}
 	public void setWorkflowId(String workflowId) {
 		this.workflowId = workflowId;
 	}
+	@NotNull
 	public String getTransitionId() {
 		return transitionId;
 	}

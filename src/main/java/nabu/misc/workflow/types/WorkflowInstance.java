@@ -28,6 +28,8 @@ public class WorkflowInstance {
 	public void setId(String id) {
 		this.id = id;
 	}
+	
+	@Field(foreignKey = "nabu.misc.workflow.types.WorkflowInstance:id")
 	public String getParentId() {
 		return parentId;
 	}

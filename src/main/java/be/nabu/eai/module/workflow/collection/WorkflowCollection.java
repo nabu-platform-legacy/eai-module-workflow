@@ -32,7 +32,16 @@ public class WorkflowCollection implements CollectionManager {
 		List<Button> buttons = new ArrayList<Button>();
 		buttons.add(EAICollectionUtils.newViewButton(entry));
 		buttons.add(EAICollectionUtils.newDeleteButton(entry, null));
-		return EAICollectionUtils.newSummaryTile(entry, "workflow-large.png", buttons.toArray(new Button[buttons.size()]));
+		List<Entry> children = new ArrayList<Entry>();
+		Entry initial = entry.getRepository().getEntry(entry.getId() + ".services.initial");
+		for (Entry child : initial) {
+			children.add(child);
+		}
+		Entry transition = entry.getRepository().getEntry(entry.getId() + ".services.transition");
+		for (Entry child : transition) {
+			children.add(child);
+		}
+		return EAICollectionUtils.newSummaryTile(entry, "workflow-large.png", children, buttons);
 	}
 	
 }

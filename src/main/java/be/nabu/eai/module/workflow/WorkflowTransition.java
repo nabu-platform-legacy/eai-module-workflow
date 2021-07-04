@@ -15,7 +15,7 @@ import be.nabu.libs.types.api.annotation.Field;
 // can not directly refer to target state as this may result in circular references!!
 // must refer to the id of the target state, separate resolving
 @ComplexTypeDescriptor(propOrder =  {"id", "name", "targetStateId", "query", "queryOrder", "startBatch", "roles", "permissionContext", "permissionAction", "description", "x", "y", "line1FromX", "line1FromY", "line1ToX", "line1ToY",
-		"line2FromX", "line2FromY", "line2ToX", "line2ToY", "target", "targetProperties" })
+		"line2FromX", "line2FromY", "line2ToX", "line2ToY", "allowMultipleAutomaticExecutions", "target", "targetProperties" })
 public class WorkflowTransition implements Comparable<WorkflowTransition> {
 	// a generated if for this state
 	private String id;
@@ -46,6 +46,9 @@ public class WorkflowTransition implements Comparable<WorkflowTransition> {
 	private String target;
 	
 	private Map<String, String> targetProperties;
+	
+	// @2021-04-16: this has no value by default because (for backwards compatibility) this is "false" for self transitions and "true" for non-self transitions by default
+	private Boolean allowMultipleAutomaticExecutions;
 	
 	public String getId() {
 		return id;
@@ -207,4 +210,12 @@ public class WorkflowTransition implements Comparable<WorkflowTransition> {
 	public void setLine2ToY(double line2ToY) {
 		this.line2ToY = line2ToY;
 	}
+	public Boolean getAllowMultipleAutomaticExecutions() {
+		return allowMultipleAutomaticExecutions;
+	}
+	@Field(comment = "Self transitions will only automatically trigger once by default, regular transitions can be triggered multiple times. Toggle this boolean to modify that behavior", show = "query != null && query != ''")
+	public void setAllowMultipleAutomaticExecutions(Boolean allowMultipleAutomaticExecutions) {
+		this.allowMultipleAutomaticExecutions = allowMultipleAutomaticExecutions;
+	}
+	
 }
