@@ -653,6 +653,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 											be.nabu.libs.services.vm.step.Map map = new be.nabu.libs.services.vm.step.Map();
 											map.setParent(service.getRoot());
 											service.getRoot().getChildren().add(map);
+											service.setId(workflow.getId() + ".services." + (iface.isInitial() ? "initial" : "transition") + "." + EAIRepositoryUtils.stringToField(iface.getTransition().getName()));
 											
 											workflow.getMappings().put(transition.getId(), service);
 //											drawTransition(workflow, child, transition);

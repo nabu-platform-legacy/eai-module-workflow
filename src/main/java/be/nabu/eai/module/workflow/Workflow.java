@@ -407,6 +407,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Mou
 			if (token != null) {
 				event.setAlias(token.getName());
 				event.setRealm(token.getRealm());
+				event.setAuthenticationId(token.getAuthenticationId());
 			}
 		}
 		

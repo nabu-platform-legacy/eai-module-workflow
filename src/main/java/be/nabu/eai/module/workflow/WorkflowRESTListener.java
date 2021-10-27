@@ -210,6 +210,7 @@ public class WorkflowRESTListener implements EventHandler<HTTPRequest, HTTPRespo
 		runtime.getContext().put("session", WebApplicationUtils.getSession(application, request));
 		runtime.getContext().put("device", device);
 		ServiceUtils.setServiceContext(runtime, service.getId());
+		runtime.getContext().put("webApplicationId", application.getId());
 
 		ComplexContent output = runtime.run(input);
 
