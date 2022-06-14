@@ -114,7 +114,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Mou
 	
 	private Map<String, DefinedStructure> structures = new HashMap<String, DefinedStructure>();
 	
-	public static WorkflowInstance resolveInstance(String connectionId, String workflowId) {
+	public static WorkflowInstance resolveInstance(String connectionId, UUID workflowId) {
 		WorkflowProvider defaultProvider = (WorkflowProvider) EAIResourceRepository.getInstance().resolve("nabu.misc.workflow.providers.basic.provider");
 		return defaultProvider.getWorkflowManager().getWorkflow(connectionId, workflowId);
 	}
@@ -245,14 +245,14 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Mou
 		}
 	}
 	
-	private void fire(String type, int code, String id, String message, String description, Severity severity, Token token) {
+	private void fire(String type, int code, UUID id, String message, String description, Severity severity, Token token) {
 		try {
 			Notification notification = new Notification();
 			if (token != null) {
 				notification.setAlias(token.getName());
 				notification.setRealm(token.getRealm());
 			}
-			notification.setContext(Arrays.asList(id, getId()));
+			notification.setContext(Arrays.asList(id.toString().replace("-", ""), getId()));
 			notification.setCode("WORKFLOW-0");
 			notification.setType("nabu.misc.workflow." + type);
 			notification.setMessage(message);
@@ -326,7 +326,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Mou
 		return stateEvaluationStructures.get(stateId);
 	}
 	
-	private WorkflowTransitionInstance getTransitionInstance(List<WorkflowTransitionInstance> history, String id) {
+	private WorkflowTransitionInstance getTransitionInstance(List<WorkflowTransitionInstance> history, UUID id) {
 		for (WorkflowTransitionInstance instance : history) {
 			if (instance.getId().equals(id)) {
 				return instance;
@@ -399,7 +399,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Mou
 			event = new ComplexEventImpl();
 			event.setEventName("workflow-transition");
 			event.setAction(transition.getName());
-			event.setCorrelationId(workflow.getId());
+			event.setCorrelationId(workflow.getId().toString().replace("-", ""));
 			event.setArtifactId(getId());
 			event.setCreated(new Date());
 			event.setStarted(event.getCreated());
@@ -436,7 +436,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Mou
 			WorkflowState sourceState = workflow.getStateId() != null ? getStateById(workflow.getStateId()) : null;
 			
 			PermissionHandler permissionHandler = getPermissionHandler();
-			if (permissionHandler != null && !permissionHandler.hasPermission(token, workflow.getId(), transition.getName())) {
+			if (permissionHandler != null && !permissionHandler.hasPermission(token, workflow.getId().toString().replace("-", ""), transition.getName())) {
 				throw new ServiceException("WORKFLOW-5", "The user does not have permission to run this transition");
 			}
 			
@@ -466,7 +466,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Mou
 			
 			// we create the transition entry
 			WorkflowTransitionInstance newInstance = new WorkflowTransitionInstance();
-			newInstance.setId(UUID.randomUUID().toString().replace("-", ""));
+			newInstance.setId(UUID.randomUUID());
 			newInstance.setDefinitionId(transition.getId());
 			newInstance.setFromStateId(workflow.getStateId());
 			
@@ -503,7 +503,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Mou
 				batch = new WorkflowBatchInstance();
 				batch.setStarted(new Date());
 				batch.setCreated(new Date());
-				batch.setId(UUID.randomUUID().toString().replace("-", ""));
+				batch.setId(UUID.randomUUID());
 				batch.setState(Level.RUNNING);
 				batch.setSystemId(getRepository().getName());
 				batch.setTransitionId(newInstance.getId());
@@ -590,7 +590,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Mou
 							
 							if (!found) {
 								WorkflowInstanceProperty property = new WorkflowInstanceProperty();
-								property.setId(UUID.randomUUID().toString().replace("-", ""));
+								property.setId(UUID.randomUUID());
 								property.setWorkflowId(workflow.getId());
 								property.setTransitionId(newInstance.getId());
 								property.setKey(key);

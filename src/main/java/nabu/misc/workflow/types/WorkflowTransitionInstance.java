@@ -2,6 +2,7 @@ package nabu.misc.workflow.types;
 
 import java.net.URI;
 import java.util.Date;
+import java.util.UUID;
 
 import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Size;
@@ -13,8 +14,9 @@ import nabu.misc.workflow.types.WorkflowInstance.Level;
 @ComplexTypeDescriptor(collectionName = "WorkflowTransitionInstances",
 	propOrder = { "id", "definitionId", "workflowId", "parentId", "actorId", "systemId", "started", "stopped", "uri", "log", "code", "errorLog", "errorCode", "sequence", "transitionState", "fromStateId", "toStateId", "batchId" })
 public class WorkflowTransitionInstance implements Comparable<WorkflowTransitionInstance> {
+	private UUID id, workflowId, parentId;
 	// the parent id is of the transition that came before
-	private String id, workflowId, parentId, definitionId;
+	private UUID definitionId;
 	// whoever triggered this transition
 	private String actorId;
 	// the system that performed the action
@@ -28,43 +30,43 @@ public class WorkflowTransitionInstance implements Comparable<WorkflowTransition
 	// the state the transition ended in
 	private Level transitionState;
 	// the state ids involved
-	private String fromStateId, toStateId;
+	private UUID fromStateId, toStateId;
 	// if this transition started a new batch, what is the id?
 	// while the batch is running this transition will be put into "WAITING" mode until the batch is resolved
 	// if the batch has no conclusion handler configured, the system will find any transition with that batch id and go from there
-	private String batchId;
+	private UUID batchId;
 	// a lot of workflows revolve around data, this allows you to log an URI reference to data relevant for this transition
 	private URI uri;
 	
 	@Field(primary = true)
 	@NotNull
-	public String getId() {
+	public UUID getId() {
 		return id;
 	}
-	public void setId(String id) {
+	public void setId(UUID id) {
 		this.id = id;
 	}
 	
 	@NotNull
-	public String getWorkflowId() {
+	public UUID getWorkflowId() {
 		return workflowId;
 	}
-	public void setWorkflowId(String workflowId) {
+	public void setWorkflowId(UUID workflowId) {
 		this.workflowId = workflowId;
 	}
 	
-	public String getParentId() {
+	public UUID getParentId() {
 		return parentId;
 	}
-	public void setParentId(String parentId) {
+	public void setParentId(UUID parentId) {
 		this.parentId = parentId;
 	}
 	
 	@NotNull
-	public String getDefinitionId() {
+	public UUID getDefinitionId() {
 		return definitionId;
 	}
-	public void setDefinitionId(String definitionId) {
+	public void setDefinitionId(UUID definitionId) {
 		this.definitionId = definitionId;
 	}
 	
@@ -138,22 +140,22 @@ public class WorkflowTransitionInstance implements Comparable<WorkflowTransition
 	public int compareTo(WorkflowTransitionInstance o) {
 		return sequence - o.sequence;
 	}
-	public String getFromStateId() {
+	public UUID getFromStateId() {
 		return fromStateId;
 	}
-	public void setFromStateId(String fromStateId) {
+	public void setFromStateId(UUID fromStateId) {
 		this.fromStateId = fromStateId;
 	}
-	public String getToStateId() {
+	public UUID getToStateId() {
 		return toStateId;
 	}
-	public void setToStateId(String toStateId) {
+	public void setToStateId(UUID toStateId) {
 		this.toStateId = toStateId;
 	}
-	public String getBatchId() {
+	public UUID getBatchId() {
 		return batchId;
 	}
-	public void setBatchId(String batchId) {
+	public void setBatchId(UUID batchId) {
 		this.batchId = batchId;
 	}
 	public String getCode() {

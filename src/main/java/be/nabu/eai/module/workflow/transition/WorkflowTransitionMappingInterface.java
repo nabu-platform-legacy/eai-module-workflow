@@ -86,7 +86,7 @@ public class WorkflowTransitionMappingInterface implements DefinedServiceInterfa
 
 	@Override
 	public String getId() {
-		return workflow.getId() + ".interfaces.mappings.transition_" + EAIRepositoryUtils.stringToField(transition.getId());
+		return workflow.getId() + ".interfaces.mappings.transition_" + transition.getId();
 	}
 
 	public Workflow getWorkflow() {

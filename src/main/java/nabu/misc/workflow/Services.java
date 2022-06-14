@@ -47,7 +47,7 @@ public class Services {
 	
 	private ExecutionContext executionContext;
 	
-	public void retry(@WebParam(name = "connectionId") String connectionId, @WebParam(name = "definitionId") String definitionId, @NotNull @WebParam(name = "workflowId") String workflowId) throws ServiceException {
+	public void retry(@WebParam(name = "connectionId") String connectionId, @WebParam(name = "definitionId") String definitionId, @NotNull @WebParam(name = "workflowId") UUID workflowId) throws ServiceException {
 		WorkflowInstance instance = null;
 		Workflow workflow = null;
 		if (definitionId == null) {
@@ -175,7 +175,7 @@ public class Services {
 	}
 	
 	@WebResult(name = "properties")
-	public List<WorkflowInstanceProperty> getProperties(@NotNull @WebParam(name = "definitionId") String definitionId, @NotNull @WebParam(name = "workflowId") String workflowId, @WebParam(name = "retainHistory") Boolean retainHistory) {
+	public List<WorkflowInstanceProperty> getProperties(@NotNull @WebParam(name = "definitionId") String definitionId, @NotNull @WebParam(name = "workflowId") UUID workflowId, @WebParam(name = "retainHistory") Boolean retainHistory) {
 		Workflow resolve = (Workflow) ArtifactResolverFactory.getInstance().getResolver().resolve(definitionId);
 		if (resolve == null) {
 			throw new IllegalArgumentException("Could not find a workflow with id: " + definitionId);
@@ -196,7 +196,7 @@ public class Services {
 	}
 
 	@WebResult(name = "properties")
-	public List<WorkflowInstanceProperty> setProperties(@NotNull @WebParam(name = "definitionId") String definitionId, @NotNull @WebParam(name = "workflowId") String workflowId, @WebParam(name = "properties") List<KeyValuePair> properties) {
+	public List<WorkflowInstanceProperty> setProperties(@NotNull @WebParam(name = "definitionId") String definitionId, @NotNull @WebParam(name = "workflowId") UUID workflowId, @WebParam(name = "properties") List<KeyValuePair> properties) {
 		if (properties == null || properties.isEmpty()) {
 			return null;
 		}
@@ -231,7 +231,7 @@ public class Services {
 			}
 			else {
 				WorkflowInstanceProperty workflowInstanceProperty = new WorkflowInstanceProperty();
-				workflowInstanceProperty.setId(UUID.randomUUID().toString().replace("-", ""));
+				workflowInstanceProperty.setId(UUID.randomUUID());
 				workflowInstanceProperty.setKey(property.getKey());
 				workflowInstanceProperty.setValue(property.getValue());
 				workflowInstanceProperty.setTransitionId(transition.getId());
@@ -260,7 +260,7 @@ public class Services {
 	}
 	
 	@WebResult(name = "transitions")
-	public List<WorkflowTransitionInstance> getHistory(@NotNull @WebParam(name = "definitionId") String definitionId, @NotNull @WebParam(name = "workflowId") String workflowId) {
+	public List<WorkflowTransitionInstance> getHistory(@NotNull @WebParam(name = "definitionId") String definitionId, @NotNull @WebParam(name = "workflowId") UUID workflowId) {
 		Workflow resolve = (Workflow) ArtifactResolverFactory.getInstance().getResolver().resolve(definitionId);
 		if (resolve == null) {
 			throw new IllegalArgumentException("Could not find a workflow with id: " + definitionId);
@@ -287,13 +287,13 @@ public class Services {
 	@WebResult(name = "workflows")
 	public List<WorkflowInstance> getWorkflowsForUser(
 			@NotNull @WebParam(name = "definitionId") String definitionId, 
-			@NotNull @WebParam(name = "stateId") String stateId, 
+			@NotNull @WebParam(name = "stateId") UUID stateId, 
 			@WebParam(name = "token") Token token, 
 			@WebParam(name = "from") Date from, 
 			@WebParam(name = "until") Date until,
 			@WebParam(name = "environment") String environment, 
-			@WebParam(name = "parentId") String parentId, 
-			@WebParam(name = "batchId") String batchId, 
+			@WebParam(name = "parentId") UUID parentId, 
+			@WebParam(name = "batchId") UUID batchId, 
 			@WebParam(name = "correlationId") String correlationId,
 			@WebParam(name = "contextId") String contextId,
 			@WebParam(name = "groupId") String groupId,
@@ -306,7 +306,7 @@ public class Services {
 	}
 	
 	@WebResult(name = "workflow")
-	public WorkflowInstance getWorkflow(@NotNull @WebParam(name = "definitionId") String definitionId, @NotNull @WebParam(name = "workflowId") String workflowId) {
+	public WorkflowInstance getWorkflow(@NotNull @WebParam(name = "definitionId") String definitionId, @NotNull @WebParam(name = "workflowId") UUID workflowId) {
 		Workflow resolve = (Workflow) ArtifactResolverFactory.getInstance().getResolver().resolve(definitionId);
 		if (resolve == null) {
 			throw new IllegalArgumentException("Could not find a workflow with id: " + definitionId);
@@ -317,13 +317,13 @@ public class Services {
 	@WebResult(name = "workflows")
 	public List<WorkflowInstance> getWorkflows(
 			@NotNull @WebParam(name = "definitionId") String definitionId, 
-			@WebParam(name = "stateId") String stateId, 
+			@WebParam(name = "stateId") UUID stateId, 
 			@WebParam(name = "transactionState") Level level, 
 			@WebParam(name = "from") Date from, 
 			@WebParam(name = "until") Date until,
 			@WebParam(name = "environment") String environment, 
-			@WebParam(name = "parentId") String parentId, 
-			@WebParam(name = "batchId") String batchId, 
+			@WebParam(name = "parentId") UUID parentId, 
+			@WebParam(name = "batchId") UUID batchId, 
 			@WebParam(name = "correlationId") String correlationId,
 			@WebParam(name = "contextId") String contextId,
 			@WebParam(name = "groupId") String groupId,
@@ -337,14 +337,14 @@ public class Services {
 	
 	private List<WorkflowInstance> getAnyWorkflows(
 			@NotNull @WebParam(name = "definitionId") String definitionId, 
-			@WebParam(name = "stateId") String stateId, 
+			@WebParam(name = "stateId") UUID stateId, 
 			@WebParam(name = "token") Token token, 
 			@WebParam(name = "transactionState") Level level, 
 			@WebParam(name = "from") Date from, 
 			@WebParam(name = "until") Date until,
 			@WebParam(name = "environment") String environment, 
-			@WebParam(name = "parentId") String parentId, 
-			@WebParam(name = "batchId") String batchId, 
+			@WebParam(name = "parentId") UUID parentId, 
+			@WebParam(name = "batchId") UUID batchId, 
 			@WebParam(name = "correlationId") String correlationId,
 			@WebParam(name = "contextId") String contextId,
 			@WebParam(name = "groupId") String groupId,
@@ -396,13 +396,13 @@ public class Services {
 	@WebResult(name = "amount")
 	public Long getAmountOfWorkflows(
 			@NotNull @WebParam(name = "definitionId") String definitionId, 
-			@WebParam(name = "stateId") String stateId, 
+			@WebParam(name = "stateId") UUID stateId, 
 			@WebParam(name = "transactionState") Level level, 
 			@WebParam(name = "from") Date from, 
 			@WebParam(name = "until") Date until,
 			@WebParam(name = "environment") String environment, 
-			@WebParam(name = "parentId") String parentId, 
-			@WebParam(name = "batchId") String batchId, 
+			@WebParam(name = "parentId") UUID parentId, 
+			@WebParam(name = "batchId") UUID batchId, 
 			@WebParam(name = "correlationId") String correlationId,
 			@WebParam(name = "contextId") String contextId,
 			@WebParam(name = "groupId") String groupId,

@@ -2,6 +2,7 @@ package nabu.misc.workflow.types;
 
 import java.net.URI;
 import java.util.Date;
+import java.util.UUID;
 
 import javax.validation.constraints.NotNull;
 
@@ -11,9 +12,10 @@ import be.nabu.libs.types.api.annotation.Field;
 @ComplexTypeDescriptor(collectionName = "WorkflowInstances",
 	propOrder = { "id", "definitionId", "version", "parentId", "batchId", "contextId", "groupId", "correlationId", "workflowType", "uri", "started", "stopped", "environment", "transitionState", "stateId", "anonymized" })
 public class WorkflowInstance {
-	private String id, parentId, definitionId;
+	private UUID id, parentId, batchId, stateId;
+	private String definitionId;
 	private Date started, stopped;
-	private String stateId, batchId, contextId, groupId, correlationId, environment, workflowType;
+	private String contextId, groupId, correlationId, environment, workflowType;
 	private Level transitionState;
 	private URI uri;
 	// the version of the workflow you are running
@@ -22,18 +24,18 @@ public class WorkflowInstance {
 	
 	@Field(primary = true)
 	@NotNull
-	public String getId() {
+	public UUID getId() {
 		return id;
 	}
-	public void setId(String id) {
+	public void setId(UUID id) {
 		this.id = id;
 	}
 	
 	@Field(foreignKey = "nabu.misc.workflow.types.WorkflowInstance:id")
-	public String getParentId() {
+	public UUID getParentId() {
 		return parentId;
 	}
-	public void setParentId(String parentId) {
+	public void setParentId(UUID parentId) {
 		this.parentId = parentId;
 	}
 	
@@ -61,17 +63,17 @@ public class WorkflowInstance {
 	}
 	
 	@NotNull
-	public String getStateId() {
+	public UUID getStateId() {
 		return stateId;
 	}
-	public void setStateId(String stateId) {
+	public void setStateId(UUID stateId) {
 		this.stateId = stateId;
 	}
 	
-	public String getBatchId() {
+	public UUID getBatchId() {
 		return batchId;
 	}
-	public void setBatchId(String batchId) {
+	public void setBatchId(UUID batchId) {
 		this.batchId = batchId;
 	}
 	

@@ -70,10 +70,10 @@ public class WorkflowTransitionServiceInstance implements ServiceInstance {
 			instance = new WorkflowInstance();
 			instance.setVersion(service.getWorkflow().getVersion());
 			if (input != null) {
-				instance.setId((String) input.get("workflowId"));
-				instance.setParentId((String) input.get("parentId"));
+				instance.setId((UUID) input.get("workflowId"));
+				instance.setParentId((UUID) input.get("parentId"));
 				instance.setCorrelationId((String) input.get("correlationId"));
-				instance.setBatchId((String) input.get("batchId"));
+				instance.setBatchId((UUID) input.get("batchId"));
 				instance.setGroupId((String) input.get("groupId"));
 				instance.setContextId((String) input.get("contextId"));
 				instance.setWorkflowType((String) input.get("workflowType"));
@@ -81,12 +81,12 @@ public class WorkflowTransitionServiceInstance implements ServiceInstance {
 			}
 			// generate an id if none was passed in
 			if (instance.getId() == null) {
-				instance.setId(UUID.randomUUID().toString().replace("-", ""));
+				instance.setId(UUID.randomUUID());
 			}
 			instance.setStarted(new Date());
 			instance.setDefinitionId(service.getWorkflow().getId());
 			instance.setEnvironment(service.getWorkflow().getRepository().getGroup());
-			instance.setStateId(service.getFromState().getId());
+			instance.setStateId(UUID.fromString(service.getFromState().getId()));
 			instance.setTransitionState(Level.RUNNING);
 			
 			// when creating a workflow and we are interested in versioning, make sure the version is persisted somewhere
@@ -105,7 +105,7 @@ public class WorkflowTransitionServiceInstance implements ServiceInstance {
 			});
 		}
 		else {
-			String workflowId = input == null ? null : (String) input.get("workflowId");
+			UUID workflowId = input == null ? null : (UUID) input.get("workflowId");
 			if (workflowId == null) {
 				throw new ServiceException("WORKFLOW-1", "No workflow id given");
 			}
@@ -133,7 +133,7 @@ public class WorkflowTransitionServiceInstance implements ServiceInstance {
 			// a global state can be triggered from anywhere
 			if (!instance.getStateId().equals(service.getFromState().getId()) && !service.getFromState().isGlobalState()) {
 				// check if the "from state" is actually an extension
-				WorkflowState state = service.getWorkflow().getStateById(instance.getStateId());
+				WorkflowState state = service.getWorkflow().getStateById(instance.getStateId().toString().replace("-", ""));
 				
 				// check if the state is the same as the source state of this service or an extension
 				boolean isExtension = isExtension(state, new HashSet<WorkflowState>());

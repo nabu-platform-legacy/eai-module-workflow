@@ -1,6 +1,7 @@
 package nabu.misc.workflow.types;
 
 import java.util.Date;
+import java.util.UUID;
 
 import javax.validation.constraints.NotNull;
 
@@ -11,8 +12,9 @@ import nabu.misc.workflow.types.WorkflowInstance.Level;
 @ComplexTypeDescriptor(collectionName = "WorkflowBatchInstances",
 	propOrder = { "id", "workflowId", "transitionId", "systemId", "started", "created", "stopped", "state" })
 public class WorkflowBatchInstance {
+	private UUID id, workflowId, transitionId;
 	// the id of the batch and of the workflow that created the batch as well as the transition that created the batch
-	private String id, workflowId, transitionId, systemId;
+	private String systemId;
 	// when the batch instance was started, when all batch children were created
 	// and when the batch was stopped
 	private Date started, created, stopped;
@@ -21,24 +23,24 @@ public class WorkflowBatchInstance {
 	
 	@NotNull
 	@Field(primary = true)
-	public String getId() {
+	public UUID getId() {
 		return id;
 	}
-	public void setId(String id) {
+	public void setId(UUID id) {
 		this.id = id;
 	}
 	@NotNull
-	public String getWorkflowId() {
+	public UUID getWorkflowId() {
 		return workflowId;
 	}
-	public void setWorkflowId(String workflowId) {
+	public void setWorkflowId(UUID workflowId) {
 		this.workflowId = workflowId;
 	}
 	@NotNull
-	public String getTransitionId() {
+	public UUID getTransitionId() {
 		return transitionId;
 	}
-	public void setTransitionId(String transitionId) {
+	public void setTransitionId(UUID transitionId) {
 		this.transitionId = transitionId;
 	}
 	public Date getStarted() {

@@ -2,6 +2,7 @@ package be.nabu.eai.module.workflow.provider;
 
 import java.util.Date;
 import java.util.List;
+import java.util.UUID;
 
 import javax.jws.WebParam;
 import javax.jws.WebResult;
@@ -19,19 +20,19 @@ public interface WorkflowManager {
 	public void createWorkflow(@WebParam(name = "connectionId") String connectionId, @WebParam(name = "transactionId") String transactionId, @NotNull @WebParam(name = "instance") WorkflowInstance instance);
 	public void updateWorkflow(@WebParam(name = "connectionId") String connectionId, @WebParam(name = "transactionId") String transactionId, @NotNull @WebParam(name = "instance") WorkflowInstance instance);
 	@WebResult(name = "workflow")
-	public WorkflowInstance getWorkflow(@WebParam(name = "connectionId") String connectionId, @WebParam(name = "workflowId") @NotNull String workflowId);
+	public WorkflowInstance getWorkflow(@WebParam(name = "connectionId") String connectionId, @WebParam(name = "workflowId") @NotNull UUID workflowId);
 	
 	@WebResult(name = "workflows")
 	public List<WorkflowInstance> getWorkflows(
 		@WebParam(name = "connectionId") String connectionId, 
 		@NotNull @WebParam(name = "definitionId") String definitionId, 
-		@WebParam(name = "stateId") String stateId, 
+		@WebParam(name = "stateId") UUID stateId, 
 		@WebParam(name = "transitionState") Level state, 
 		@WebParam(name = "from") Date from, 
 		@WebParam(name = "until") Date until, 
 		@WebParam(name = "environment") String environment, 
-		@WebParam(name = "parentId") String parentId, 
-		@WebParam(name = "batchId") String batchId, 
+		@WebParam(name = "parentId") UUID parentId, 
+		@WebParam(name = "batchId") UUID batchId, 
 		@WebParam(name = "correlationId") String correlationId,
 		@WebParam(name = "contextId") String contextId,
 		@WebParam(name = "groupId") String groupId,
@@ -45,12 +46,12 @@ public interface WorkflowManager {
 	public void createWorkflowProperties(@WebParam(name = "connectionId") String connectionId, @WebParam(name = "transactionId") String transactionId, @WebParam(name = "properties") List<WorkflowInstanceProperty> properties);
 	public void updateWorkflowProperties(@WebParam(name = "connectionId") String connectionId, @WebParam(name = "transactionId") String transactionId, @WebParam(name = "properties") List<WorkflowInstanceProperty> properties);
 	@WebResult(name = "properties")
-	public List<WorkflowInstanceProperty> getWorkflowProperties(@WebParam(name = "connectionId") String connectionId, @WebParam(name = "workflowId") @NotNull String workflowId);
+	public List<WorkflowInstanceProperty> getWorkflowProperties(@WebParam(name = "connectionId") String connectionId, @WebParam(name = "workflowId") @NotNull UUID workflowId);
 	
 	public void createTransition(@WebParam(name = "connectionId") String connectionId, @WebParam(name = "transactionId") String transactionId, @WebParam(name = "instance") WorkflowTransitionInstance instance);
 	public void updateTransition(@WebParam(name = "connectionId") String connectionId, @WebParam(name = "transactionId") String transactionId, @WebParam(name = "instance") WorkflowTransitionInstance instance);
 	@WebResult(name = "transitions")
-	public List<WorkflowTransitionInstance> getTransitions(@WebParam(name = "connectionId") String connectionId, @WebParam(name = "workflowId") @NotNull String workflowId);
+	public List<WorkflowTransitionInstance> getTransitions(@WebParam(name = "connectionId") String connectionId, @WebParam(name = "workflowId") @NotNull UUID workflowId);
 
 	public void createBatch(@WebParam(name = "connectionId") String connectionId, @WebParam(name = "transactionId") String transactionId, @NotNull @WebParam(name = "instance") WorkflowBatchInstance instance);
 	// update the batch but do so in a way that it can not fail in a concurrent environment
@@ -63,9 +64,9 @@ public interface WorkflowManager {
 	// STOPPED: when all child workflows are completed but the batch is not yet progressing (note that this is a computed state only, the batch itself will not appear in this state in the database)
 	// ERROR/FAILED: at least one of the child workflows is in error (we don't continue with batch)
 	// SUCCEEDED: the batch is done and all child workflows are correct
-	public Level calculateBatchState(@WebParam(name = "connectionId") String connectionId, @NotNull @WebParam(name = "batchId") String batchId);
+	public Level calculateBatchState(@WebParam(name = "connectionId") String connectionId, @NotNull @WebParam(name = "batchId") UUID batchId);
 	@WebResult(name = "batch")
-	public WorkflowBatchInstance getBatch(@WebParam(name = "connectionId") String connectionId, @WebParam(name = "batchId") @NotNull String batchId);
+	public WorkflowBatchInstance getBatch(@WebParam(name = "connectionId") String connectionId, @WebParam(name = "batchId") @NotNull UUID batchId);
 	
 	@WebResult(name = "batches")
 	public List<WorkflowBatchInstance> getBatches(@WebParam(name = "connectionId") String connectionId, @WebParam(name = "state") Level state, @WebParam(name = "offset") Integer offset, @WebParam(name = "limit") Integer limit);
@@ -81,13 +82,13 @@ public interface WorkflowManager {
 	public default Long getAmountOfWorkflows(
 		@WebParam(name = "connectionId") String connectionId, 
 		@NotNull @WebParam(name = "definitionId") String definitionId, 
-		@WebParam(name = "stateId") String stateId, 
+		@WebParam(name = "stateId") UUID stateId, 
 		@WebParam(name = "transitionState") Level state, 
 		@WebParam(name = "from") Date from, 
 		@WebParam(name = "until") Date until, 
 		@WebParam(name = "environment") String environment, 
-		@WebParam(name = "parentId") String parentId, 
-		@WebParam(name = "batchId") String batchId, 
+		@WebParam(name = "parentId") UUID parentId, 
+		@WebParam(name = "batchId") UUID batchId, 
 		@WebParam(name = "correlationId") String correlationId,
 		@WebParam(name = "contextId") String contextId,
 		@WebParam(name = "groupId") String groupId,

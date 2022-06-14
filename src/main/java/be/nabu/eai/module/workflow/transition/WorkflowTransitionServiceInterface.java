@@ -35,7 +35,7 @@ public class WorkflowTransitionServiceInterface implements DefinedServiceInterfa
 			this.workflow = workflow;
 			this.fromState = fromState;
 			this.transition = transition;
-			this.isInitial = workflow.getInitialStates().contains(fromState) && !workflow.isExtensionState(fromState.getId()) && !workflow.isExtensionState(fromState.getName());
+			this.isInitial = workflow.getInitialStates().contains(fromState) && !workflow.isExtensionState(fromState.getId());
 		}
 		
 		private Structure input, output;

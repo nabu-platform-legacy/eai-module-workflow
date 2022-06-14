@@ -1,5 +1,7 @@
 package nabu.misc.workflow.types;
 
+import java.util.UUID;
+
 import javax.validation.constraints.NotNull;
 
 import be.nabu.libs.types.api.KeyValuePair;
@@ -9,21 +11,22 @@ import be.nabu.libs.types.api.annotation.ComplexTypeDescriptor;
 	propOrder = { "id", "workflowId", "key", "value", "transitionId" })
 public class WorkflowInstanceProperty implements KeyValuePair {
 
-	private String id, workflowId, key, value, transitionId;
+	private UUID id, workflowId, transitionId;
+	private String key, value;
 
 	@NotNull
-	public String getId() {
+	public UUID getId() {
 		return id;
 	}
-	public void setId(String id) {
+	public void setId(UUID id) {
 		this.id = id;
 	}
 	
 	@NotNull
-	public String getWorkflowId() {
+	public UUID getWorkflowId() {
 		return workflowId;
 	}
-	public void setWorkflowId(String workflowId) {
+	public void setWorkflowId(UUID workflowId) {
 		this.workflowId = workflowId;
 	}
 	
@@ -44,10 +47,10 @@ public class WorkflowInstanceProperty implements KeyValuePair {
 	}
 
 	@NotNull
-	public String getTransitionId() {
+	public UUID getTransitionId() {
 		return transitionId;
 	}
-	public void setTransitionId(String transitionId) {
+	public void setTransitionId(UUID transitionId) {
 		this.transitionId = transitionId;
 	}
 	
