@@ -29,6 +29,8 @@ public class WorkflowBatchInstance {
 	public void setId(UUID id) {
 		this.id = id;
 	}
+	
+	@Field(foreignKey = "nabu.misc.workflow.types.WorkflowInstance:id")
 	@NotNull
 	public UUID getWorkflowId() {
 		return workflowId;
@@ -36,6 +38,8 @@ public class WorkflowBatchInstance {
 	public void setWorkflowId(UUID workflowId) {
 		this.workflowId = workflowId;
 	}
+	
+	@Field(foreignKey = "nabu.misc.workflow.types.workflowTransition:id")
 	@NotNull
 	public UUID getTransitionId() {
 		return transitionId;

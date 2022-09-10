@@ -46,8 +46,8 @@ public class WorkflowTransitionMappingInterface implements DefinedServiceInterfa
 					input.add(new SimpleElementImpl<String>("connectionId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
 					input.add(new ComplexElementImpl("workflow", (ComplexType) BeanResolver.getInstance().resolve(WorkflowInstance.class), input));
 					input.add(new ComplexElementImpl("properties", workflow.getStructures().get("properties"), input));
-					input.add(new ComplexElementImpl("state", workflow.getStructures().get(fromState.getId()), input));
-					input.add(new ComplexElementImpl("transition", workflow.getStructures().get(transition.getId()), input));
+					input.add(new ComplexElementImpl("state", workflow.getStructures().get(Workflow.stringify(fromState.getId())), input));
+					input.add(new ComplexElementImpl("transition", workflow.getStructures().get(Workflow.stringify(transition.getId())), input));
 					input.add(new ComplexElementImpl("history", (ComplexType) BeanResolver.getInstance().resolve(WorkflowTransitionInstance.class), input, new ValueImpl<Integer>(MaxOccursProperty.getInstance(), 0), new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
 					this.input = input;
 				}
@@ -64,7 +64,7 @@ public class WorkflowTransitionMappingInterface implements DefinedServiceInterfa
 					Structure output = new Structure();
 					output.setName("output");
 					output.add(new ComplexElementImpl("properties", workflow.getStructures().get("properties"), output));
-					output.add(new ComplexElementImpl("state", workflow.getStructures().get(toState.getId()), output));
+					output.add(new ComplexElementImpl("state", workflow.getStructures().get(Workflow.stringify(toState.getId())), output));
 					output.add(new SimpleElementImpl<String>("correlationId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), output, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
 					output.add(new SimpleElementImpl<String>("contextId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), output, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
 					output.add(new SimpleElementImpl<String>("groupId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), output, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
@@ -86,7 +86,7 @@ public class WorkflowTransitionMappingInterface implements DefinedServiceInterfa
 
 	@Override
 	public String getId() {
-		return workflow.getId() + ".interfaces.mappings.transition_" + transition.getId();
+		return workflow.getId() + ".interfaces.mappings.transition_" + Workflow.stringify(transition.getId());
 	}
 
 	public Workflow getWorkflow() {

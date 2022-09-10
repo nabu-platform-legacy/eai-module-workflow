@@ -6,6 +6,7 @@ import javax.validation.constraints.NotNull;
 
 import be.nabu.libs.types.api.KeyValuePair;
 import be.nabu.libs.types.api.annotation.ComplexTypeDescriptor;
+import be.nabu.libs.types.api.annotation.Field;
 
 @ComplexTypeDescriptor(collectionName = "WorkflowInstanceProperties",
 	propOrder = { "id", "workflowId", "key", "value", "transitionId" })
@@ -22,6 +23,7 @@ public class WorkflowInstanceProperty implements KeyValuePair {
 		this.id = id;
 	}
 	
+	@Field(foreignKey = "nabu.misc.workflow.types.WorkflowInstance:id")
 	@NotNull
 	public UUID getWorkflowId() {
 		return workflowId;
@@ -46,6 +48,7 @@ public class WorkflowInstanceProperty implements KeyValuePair {
 		this.value = value;
 	}
 
+	@Field(foreignKey = "nabu.misc.workflow.types.workflowTransition:id")
 	@NotNull
 	public UUID getTransitionId() {
 		return transitionId;

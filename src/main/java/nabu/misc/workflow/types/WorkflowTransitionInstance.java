@@ -55,6 +55,7 @@ public class WorkflowTransitionInstance implements Comparable<WorkflowTransition
 		this.workflowId = workflowId;
 	}
 	
+	@Field(foreignKey = "nabu.misc.workflow.types.WorkflowTransitionInstance:id")
 	public UUID getParentId() {
 		return parentId;
 	}
@@ -62,6 +63,7 @@ public class WorkflowTransitionInstance implements Comparable<WorkflowTransition
 		this.parentId = parentId;
 	}
 	
+	@Field(foreignKey = "nabu.misc.workflow.types.workflowTransition:id")
 	@NotNull
 	public UUID getDefinitionId() {
 		return definitionId;
@@ -140,18 +142,22 @@ public class WorkflowTransitionInstance implements Comparable<WorkflowTransition
 	public int compareTo(WorkflowTransitionInstance o) {
 		return sequence - o.sequence;
 	}
+	
+	@Field(foreignKey = "nabu.misc.workflow.types.workflowState:id")
 	public UUID getFromStateId() {
 		return fromStateId;
 	}
 	public void setFromStateId(UUID fromStateId) {
 		this.fromStateId = fromStateId;
 	}
+	@Field(foreignKey = "nabu.misc.workflow.types.workflowState:id")
 	public UUID getToStateId() {
 		return toStateId;
 	}
 	public void setToStateId(UUID toStateId) {
 		this.toStateId = toStateId;
 	}
+	@Field(foreignKey = "nabu.misc.workflow.types.WorkflowBatchInstance:id")
 	public UUID getBatchId() {
 		return batchId;
 	}

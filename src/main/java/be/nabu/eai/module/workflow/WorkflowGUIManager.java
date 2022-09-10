@@ -131,14 +131,18 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		super("Workflow", Workflow.class, new WorkflowManager(), WorkflowConfiguration.class);
 	}
 	
-	private Map<String, RectangleWithHooks> states = new HashMap<String, RectangleWithHooks>();
-	private Map<String, List<Node>> extensions = new HashMap<String, List<Node>>();
-	private Map<String, List<Node>> transitions = new HashMap<String, List<Node>>();
+	private Map<UUID, RectangleWithHooks> states = new HashMap<UUID, RectangleWithHooks>();
+	private Map<UUID, List<Node>> extensions = new HashMap<UUID, List<Node>>();
+	private Map<UUID, List<Node>> transitions = new HashMap<UUID, List<Node>>();
 	private AnchorPane drawPane;
 	private Line draggingLine;
 	private AnchorPane mapPane;
 	private String dragMode = "move";
 
+	private static String stringify(UUID uuid) {
+		return uuid.toString().replace("-", "");
+	}
+	
 	@Override
 	public void display(MainController controller, AnchorPane pane, Workflow artifact) {
 		SplitPane split = new SplitPane();
@@ -156,9 +160,9 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		// draw extensions
 		for (WorkflowState state : artifact.getConfig().getStates()) {
 			if (state.getExtensions() != null) {
-				Iterator<String> iterator = state.getExtensions().iterator();
+				Iterator<UUID> iterator = state.getExtensions().iterator();
 				while (iterator.hasNext()) {
-					String id = iterator.next();
+					UUID id = iterator.next();
 					WorkflowState parent = artifact.getStateById(id);
 					if (parent != null) {
 						// draw possible extensions
@@ -220,7 +224,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 							}
 							else {
 								WorkflowState state = new WorkflowState();
-								state.setId(UUID.randomUUID().toString().replace("-", ""));
+								state.setId(UUID.randomUUID());
 								state.setName(name);
 								if (lastStateId != null) {
 									WorkflowState stateById = artifact.getStateById(lastStateId);
@@ -234,7 +238,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 								DefinedStructure value = new DefinedStructure();
 								value.setName("state");
 								value.setId(artifact.getId() + ".types.states." + EAIRepositoryUtils.stringToField(state.getName()));
-								artifact.getStructures().put(state.getId(), value);
+								artifact.getStructures().put(stringify(state.getId()), value);
 								lastStateId = state.getId();
 								((WorkflowManager) getArtifactManager()).refreshChildren((ModifiableEntry) artifact.getRepository().getEntry(artifact.getId()), artifact);
 								drawState(artifact, state);
@@ -367,7 +371,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 		return modifiableProperties;
 	}
 	
-	private String lastStateId;
+	private UUID lastStateId;
 	private ScrollPane drawScrollPane;
 
 	private void drawState(final Workflow workflow, final WorkflowState state) {
@@ -449,7 +453,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 					Label leftLabel = new Label("State Input");
 					leftLabel.getStyleClass().add("h2");
 					left.getChildren().add(leftLabel);
-					structureGUIManager.display(MainController.getInstance(), left, workflow.getStructures().get(state.getId()));
+					structureGUIManager.display(MainController.getInstance(), left, workflow.getStructures().get(stringify(state.getId())));
 				}
 				catch (Exception e) {
 					throw new RuntimeException(e);
@@ -495,7 +499,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 							// remove the state
 							workflow.getConfig().getStates().remove(state);
 							// remove the structure associated with the transiens state (if any)
-							workflow.getStructures().remove(state.getId());
+							workflow.getStructures().remove(stringify(state.getId()));
 							MainController.getInstance().setChanged();
 						}
 					});
@@ -524,7 +528,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 			@Override
 			public void handle(DragEvent event) {
 				Object content = event.getDragboard().getContent(TreeDragDrop.getDataFormat("connect"));
-				if (content != null && !workflow.isExtensionState(state.getId()) && !workflow.isExtensionState(state.getName())) {
+				if (content != null && !workflow.isExtensionState(state.getId())) {
 					event.acceptTransferModes(TransferMode.ANY);
 					event.consume();
 				}
@@ -554,14 +558,14 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 				}
 				// we _could_ do further checking but...not now :|
 				if (!event.isConsumed()) {
-					String transitionFrom = (String) event.getDragboard().getContent(TreeDragDrop.getDataFormat("workflow-transition-from"));
+					Object transitionFrom = event.getDragboard().getContent(TreeDragDrop.getDataFormat("workflow-transition-from"));
 					if (transitionFrom != null) {
 						event.acceptTransferModes(TransferMode.MOVE);
 						event.consume();
 					}
 				}
 				if (!event.isConsumed()) {
-					String transitionTo = (String) event.getDragboard().getContent(TreeDragDrop.getDataFormat("workflow-transition-to"));
+					Object transitionTo = event.getDragboard().getContent(TreeDragDrop.getDataFormat("workflow-transition-to"));
 					if (transitionTo != null) {
 						event.acceptTransferModes(TransferMode.MOVE);
 						event.consume();
@@ -599,7 +603,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 								}
 								else {
 									WorkflowTransition transition = new WorkflowTransition();
-									transition.setId(UUID.randomUUID().toString().replace("-", ""));
+									transition.setId(UUID.randomUUID());
 									transition.setTargetStateId(state.getId());
 									transition.setName(name);
 									
@@ -611,7 +615,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 											DefinedStructure value = new DefinedStructure();
 											value.setId(workflow.getId() + ".types.transitions." + EAIRepositoryUtils.stringToField(transition.getName()));
 											value.setName("transition");
-											workflow.getStructures().put(transition.getId(), value);
+											workflow.getStructures().put(stringify(transition.getId()), value);
 											((WorkflowManager) getArtifactManager()).refreshChildren((ModifiableEntry) workflow.getRepository().getEntry(workflow.getId()), workflow);
 	
 											RectangleWithHooks rectangleWithHooks = states.get(state.getId());
@@ -655,7 +659,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 											service.getRoot().getChildren().add(map);
 											service.setId(workflow.getId() + ".services." + (iface.isInitial() ? "initial" : "transition") + "." + EAIRepositoryUtils.stringToField(iface.getTransition().getName()));
 											
-											workflow.getMappings().put(transition.getId(), service);
+											workflow.getMappings().put(stringify(transition.getId()), service);
 //											drawTransition(workflow, child, transition);
 											
 //											if (workflow.isSelfTransition(transition)) {
@@ -684,10 +688,10 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 				else {
 					Object extendContent = event.getDragboard().getContent(TreeDragDrop.getDataFormat("extend"));
 					if (extendContent != null) {
-						WorkflowState stateById = workflow.getStateById(extendContent.toString());
+						WorkflowState stateById = workflow.getStateById(WorkflowManager.fromString(extendContent.toString()));
 						if (stateById != null) {
 							if (stateById.getExtensions() == null) {
-								stateById.setExtensions(new ArrayList<String>());
+								stateById.setExtensions(new ArrayList<UUID>());
 							}
 							if (!stateById.getExtensions().contains(state.getId())) {
 								stateById.getExtensions().add(state.getId());
@@ -697,8 +701,11 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 						}
 					}
 				}
-				String transitionFrom = (String) event.getDragboard().getContent(TreeDragDrop.getDataFormat("workflow-transition-from"));
-				String transitionTo = (String) event.getDragboard().getContent(TreeDragDrop.getDataFormat("workflow-transition-to"));
+				Object transitionFromContent = event.getDragboard().getContent(TreeDragDrop.getDataFormat("workflow-transition-from"));
+				Object transitionToContent = event.getDragboard().getContent(TreeDragDrop.getDataFormat("workflow-transition-to"));
+				
+				UUID transitionFrom = transitionFromContent == null ? null : WorkflowManager.fromString(transitionFromContent.toString());
+				UUID transitionTo = transitionToContent == null ? null : WorkflowManager.fromString(transitionToContent.toString());
 				
 				// we want to change the transition origin state
 				if (transitionFrom != null) {
@@ -921,8 +928,8 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 	private void removeTransition(final Workflow workflow, final WorkflowState state, final WorkflowTransition transition) {
 		undrawTransition(transition);
 		state.getTransitions().remove(transition);
-		workflow.getStructures().remove(transition.getId());
-		workflow.getMappings().remove(transition.getId());
+		workflow.getStructures().remove(stringify(transition.getId()));
+		workflow.getMappings().remove(stringify(transition.getId()));
 		MainController.getInstance().setChanged();
 	}
 
@@ -985,10 +992,10 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 			}
 		});
 		
-		if (!extensions.containsKey(child)) {
+		if (!extensions.containsKey(child.getId())) {
 			extensions.put(child.getId(), new ArrayList<Node>());
 		}
-		if (!extensions.containsKey(parent)) {
+		if (!extensions.containsKey(parent.getId())) {
 			extensions.put(parent.getId(), new ArrayList<Node>());
 		}
 		extensions.get(child.getId()).add(line);
@@ -1805,15 +1812,15 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 			public boolean updateProperty(Property<?> property, Object value) {
 				if (property.getName().equals("startBatch")) {
 					if (value != null && (Boolean) value) {
-						if (workflow.getMappings().get(transition.getId()).getServiceInterface().getInputDefinition().get("batchId") == null) {
-							Structure input = (Structure) workflow.getMappings().get(transition.getId()).getPipeline().get(Pipeline.INPUT).getType();
-							input.add(new SimpleElementImpl<String>("batchId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input));
+						if (workflow.getMappings().get(stringify(transition.getId())).getServiceInterface().getInputDefinition().get("batchId") == null) {
+							Structure input = (Structure) workflow.getMappings().get(stringify(transition.getId())).getPipeline().get(Pipeline.INPUT).getType();
+							input.add(new SimpleElementImpl<UUID>("batchId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(UUID.class), input));
 							MainController.getInstance().setChanged();
 						}
 					}
 					else {
-						if (workflow.getMappings().get(transition.getId()).getServiceInterface().getInputDefinition().get("batchId") != null) {
-							Structure input = (Structure) workflow.getMappings().get(transition.getId()).getPipeline().get(Pipeline.INPUT).getType();
+						if (workflow.getMappings().get(stringify(transition.getId())).getServiceInterface().getInputDefinition().get("batchId") != null) {
+							Structure input = (Structure) workflow.getMappings().get(stringify(transition.getId())).getPipeline().get(Pipeline.INPUT).getType();
 							input.remove(input.get("batchId"));
 							MainController.getInstance().setChanged();
 						}
@@ -1951,7 +1958,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 			StructureGUIManager structureGUIManager = new StructureGUIManager();
 			// if someone externally sets an external id, it wins
 			structureGUIManager.setActualId(workflow.getId());
-			Tree<Element<?>> tree = structureGUIManager.display(MainController.getInstance(), left, new RootElementWithPush(workflow.getStructures().get(transition.getId()), true), true, false);
+			Tree<Element<?>> tree = structureGUIManager.display(MainController.getInstance(), left, new RootElementWithPush(workflow.getStructures().get(stringify(transition.getId())), true), true, false);
 //			structureGUIManager.display(MainController.getInstance(), left, workflow.getStructures().get(transition.getId()));
 			tree.addRefreshListener(new Refreshable() {
 				@Override
@@ -1977,7 +1984,7 @@ public class WorkflowGUIManager extends BaseJAXBGUIManager<WorkflowConfiguration
 			VMServiceGUIManager serviceManager = new VMServiceGUIManager();
 			serviceManager.setDisablePipelineEditing(true);
 			serviceManager.setActualId(workflow.getId());
-			VMService service = workflow.getMappings().get(transition.getId());
+			VMService service = workflow.getMappings().get(stringify(transition.getId()));
 			VBox pane = new VBox();
 			VMServiceController controller = serviceManager.displayWithController(MainController.getInstance(), pane, service);
 			TreeItem<Step> root = serviceManager.getServiceTree().rootProperty().get();

@@ -1,10 +1,8 @@
 package be.nabu.eai.module.workflow;
 
-import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.URI;
-import java.nio.charset.Charset;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -17,26 +15,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import nabu.misc.workflow.types.WorkflowBatchInstance;
-import nabu.misc.workflow.types.WorkflowInstance;
-import nabu.misc.workflow.types.WorkflowInstance.Level;
-import nabu.misc.workflow.types.WorkflowInstanceProperty;
-import nabu.misc.workflow.types.WorkflowTransitionInstance;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import be.nabu.eai.module.services.jdbc.RepositoryDataSourceResolver;
 import be.nabu.eai.module.services.vm.RepositoryExecutorProvider;
 import be.nabu.eai.module.web.application.MountableWebFragmentProvider;
-import be.nabu.eai.module.web.application.WebApplication;
 import be.nabu.eai.module.web.application.WebFragment;
-import be.nabu.eai.module.web.application.api.RESTFragment;
-import be.nabu.eai.module.web.application.api.RESTFragmentProvider;
 import be.nabu.eai.module.workflow.api.WorkflowListener;
 import be.nabu.eai.module.workflow.provider.WorkflowManager;
 import be.nabu.eai.module.workflow.provider.WorkflowProvider;
-import be.nabu.eai.module.workflow.transition.WorkflowTransitionService;
 import be.nabu.eai.repository.EAIRepositoryUtils;
 import be.nabu.eai.repository.EAIResourceRepository;
 import be.nabu.eai.repository.Notification;
@@ -44,7 +32,6 @@ import be.nabu.eai.repository.api.Node;
 import be.nabu.eai.repository.api.Repository;
 import be.nabu.eai.repository.artifacts.jaxb.JAXBArtifact;
 import be.nabu.eai.repository.util.SystemPrincipal;
-import be.nabu.libs.authentication.api.Permission;
 import be.nabu.libs.authentication.api.PermissionHandler;
 import be.nabu.libs.authentication.api.RoleHandler;
 import be.nabu.libs.authentication.api.Token;
@@ -56,11 +43,6 @@ import be.nabu.libs.evaluator.api.Operation;
 import be.nabu.libs.evaluator.impl.VariableOperation;
 import be.nabu.libs.evaluator.types.api.TypeOperation;
 import be.nabu.libs.evaluator.types.operations.TypesOperationProvider;
-import be.nabu.libs.events.api.EventDispatcher;
-import be.nabu.libs.events.api.EventSubscription;
-import be.nabu.libs.http.api.HTTPRequest;
-import be.nabu.libs.http.api.HTTPResponse;
-import be.nabu.libs.http.server.HTTPServerUtils;
 import be.nabu.libs.property.api.Value;
 import be.nabu.libs.resources.api.ResourceContainer;
 import be.nabu.libs.services.ServiceRuntime;
@@ -75,7 +57,6 @@ import be.nabu.libs.types.TypeUtils;
 import be.nabu.libs.types.api.ComplexContent;
 import be.nabu.libs.types.api.ComplexType;
 import be.nabu.libs.types.api.Element;
-import be.nabu.libs.types.api.Type;
 import be.nabu.libs.types.base.ComplexElementImpl;
 import be.nabu.libs.types.base.TypeBaseUtils;
 import be.nabu.libs.types.mask.MaskedContent;
@@ -86,6 +67,11 @@ import be.nabu.libs.validator.api.ValidationMessage.Severity;
 import be.nabu.utils.cep.api.EventSeverity;
 import be.nabu.utils.cep.impl.CEPUtils;
 import be.nabu.utils.cep.impl.ComplexEventImpl;
+import nabu.misc.workflow.types.WorkflowBatchInstance;
+import nabu.misc.workflow.types.WorkflowInstance;
+import nabu.misc.workflow.types.WorkflowInstance.Level;
+import nabu.misc.workflow.types.WorkflowInstanceProperty;
+import nabu.misc.workflow.types.WorkflowTransitionInstance;
 
 // expose folders for each state with transition methods (input extends actual transition service input + workflow instance id)
 // only expose if state is manual? as in, no transition picker
@@ -110,7 +96,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Mou
 	// one mapping per transition
 	private Map<String, VMService> mappings = new HashMap<String, VMService>();
 	
-	private Map<String, ComplexType> stateEvaluationStructures = new HashMap<String, ComplexType>();
+	private Map<UUID, ComplexType> stateEvaluationStructures = new HashMap<UUID, ComplexType>();
 	
 	private Map<String, DefinedStructure> structures = new HashMap<String, DefinedStructure>();
 	
@@ -265,8 +251,8 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Mou
 		}
 	}
 	
-	public boolean isStateless(String stateId) {
-		DefinedStructure definedStructure = getStructures().get(stateId);
+	public boolean isStateless(UUID stateId) {
+		DefinedStructure definedStructure = getStructures().get(Workflow.stringify(stateId));
 		return definedStructure == null || !TypeUtils.getAllChildren(definedStructure).iterator().hasNext();
 	}
 	
@@ -312,13 +298,13 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Mou
 		return getStructures().get("properties");
 	}
 	
-	public ComplexType getStateEvaluationType(String stateId) {
+	public ComplexType getStateEvaluationType(UUID stateId) {
 		if (!stateEvaluationStructures.containsKey(stateId)) {
 			synchronized(stateEvaluationStructures) {
 				if (!stateEvaluationStructures.containsKey(stateId)) {
 					Structure structure = new Structure();
 					structure.add(new ComplexElementImpl("properties", getStructures().get("properties"), structure));
-					structure.add(new ComplexElementImpl("state", getStructures().get(stateId), structure));
+					structure.add(new ComplexElementImpl("state", getStructures().get(Workflow.stringify(stateId)), structure));
 					stateEvaluationStructures.put(stateId, structure);
 				}
 			}
@@ -440,7 +426,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Mou
 				throw new ServiceException("WORKFLOW-5", "The user does not have permission to run this transition");
 			}
 			
-			VMService transitionService = getMappings().get(transition.getId());
+			VMService transitionService = getMappings().get(stringify(transition.getId()));
 			
 			if (transitionService == null) {
 				ServiceException serviceException = new ServiceException("WORKFLOW-2", "No transition service found");
@@ -848,7 +834,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Mou
 		List<WorkflowTransition> possibleTransitions = new ArrayList<WorkflowTransition>(targetState.getTransitions());
 		// we add the transitions of extended states, they can also autotrigger
 		if (targetState.getExtensions() != null) {
-			for (String name : targetState.getExtensions()) {
+			for (UUID name : targetState.getExtensions()) {
 				WorkflowState extended = getStateById(name);
 				if (extended.getTransitions() != null) {
 					for (WorkflowTransition transition : extended.getTransitions()) {
@@ -984,7 +970,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Mou
 		for (WorkflowState state : getConfig().getStates()) {
 			// if it starts from this state and goes back to this state, it is a self transition
 			if (state.getTransitions() != null && state.getTransitions().contains(transition)) {
-				return transition.getTargetStateId().contentEquals(state.getId());
+				return transition.getTargetStateId().equals(state.getId());
 			}
 		}
 		return false;
@@ -1032,7 +1018,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Mou
 			return false;
 		}
 		// if we have a required input, we can't automatically transition
-		DefinedStructure definedStructure = getStructures().get(transition.getId());
+		DefinedStructure definedStructure = getStructures().get(Workflow.stringify(transition.getId()));
 		for (Element<?> child : TypeUtils.getAllChildren(definedStructure)) {
 			Value<Integer> minOccurs = child.getProperty(MinOccursProperty.getInstance());
 			if (minOccurs == null || minOccurs.getValue() != 0) {
@@ -1051,20 +1037,20 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Mou
 		return null;
 	}
 
-	public WorkflowState getStateById(String id) {
+	public WorkflowState getStateById(UUID id) {
 		for (WorkflowState state : getConfig().getStates()) {
-			if (state.getId().equals(id) || state.getName().equals(id)) {
+			if (state.getId().equals(id)) {
 				return state;
 			}
 		}
 		return null;
 	}
 	
-	public WorkflowState getTransitionFromState(String transitionId) {
+	public WorkflowState getTransitionFromState(UUID transitionId) {
 		for (WorkflowState state : getConfig().getStates()) {
 			if (state.getTransitions() != null) {
 				for (WorkflowTransition transition : state.getTransitions()) {
-					if (transition.getId().equals(transitionId) || transition.getName().equals(transitionId)) {
+					if (transition.getId().equals(transitionId)) {
 						return state;
 					}
 				}
@@ -1073,7 +1059,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Mou
 		return null;
 	}
 	
-	public WorkflowTransition getTransitionById(String id) {
+	public WorkflowTransition getTransitionById(UUID id) {
 		for (WorkflowState state : getConfig().getStates()) {
 			WorkflowTransition potential = getTransitionById(id, state);
 			if (potential != null) {
@@ -1083,7 +1069,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Mou
 		return null;
 	}
 	
-	private WorkflowTransition getTransitionById(String id, WorkflowState state) {
+	private WorkflowTransition getTransitionById(UUID id, WorkflowState state) {
 		if (state.getTransitions() != null) {
 			for (WorkflowTransition transition : state.getTransitions()) {
 				if (id.equals(transition.getId())) {
@@ -1094,7 +1080,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Mou
 		return null;
 	}
 
-	public boolean isExtensionState(String id) {
+	public boolean isExtensionState(UUID id) {
 		if (getConfig().getStates() != null) {
 			for (WorkflowState state : getConfig().getStates()) {
 				if (state.getExtensions() != null && state.getExtensions().contains(id)) {
@@ -1106,8 +1092,8 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Mou
 	}
 	
 	public Collection<WorkflowState> getInitialStates() {
-		Map<String, WorkflowState> initialStates = new HashMap<String, WorkflowState>();
-		List<String> targetedStates = new ArrayList<String>();
+		Map<UUID, WorkflowState> initialStates = new HashMap<UUID, WorkflowState>();
+		List<UUID> targetedStates = new ArrayList<UUID>();
 		for (WorkflowState state : getConfig().getStates()) {
 			if (!state.isGlobalState()) {
 				initialStates.put(state.getId(), state);
@@ -1116,7 +1102,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Mou
 				targetedStates.add(transition.getTargetStateId());
 			}
 		}
-		for (String targetedState : targetedStates) {
+		for (UUID targetedState : targetedStates) {
 			initialStates.remove(targetedState);
 		}
 		return initialStates.values();
@@ -1131,7 +1117,7 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Mou
 			return false;
 		}
 		else if (state.getExtensions() != null) {
-			for (String extensionId : state.getExtensions()) {
+			for (UUID extensionId : state.getExtensions()) {
 				WorkflowState extended = getStateById(extensionId);
 				if (!isFinalState(extended)) {
 					return false;
@@ -1141,11 +1127,15 @@ public class Workflow extends JAXBArtifact<WorkflowConfiguration> implements Mou
 		return true;
 	}
 	
+	public static String stringify(UUID uuid) {
+		return uuid.toString().replace("-", "");
+	}
+	
 	public Collection<WorkflowState> getFinalStates() {
 		Map<String, WorkflowState> finalStates = new HashMap<String, WorkflowState>();
 		for (WorkflowState state : getConfig().getStates()) {
 			if (isFinalState(state)) {
-				finalStates.put(state.getId(), state);
+				finalStates.put(stringify(state.getId()), state);
 			}
 		}
 		return finalStates.values();

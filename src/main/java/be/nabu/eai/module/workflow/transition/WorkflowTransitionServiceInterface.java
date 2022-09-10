@@ -1,6 +1,7 @@
 package be.nabu.eai.module.workflow.transition;
 
 import java.net.URI;
+import java.util.UUID;
 
 import be.nabu.eai.module.workflow.Workflow;
 import be.nabu.eai.module.workflow.WorkflowState;
@@ -49,7 +50,7 @@ public class WorkflowTransitionServiceInterface implements DefinedServiceInterfa
 						input.add(new SimpleElementImpl<String>("connectionId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0),
 							new ValueImpl<Scope>(ScopeProperty.getInstance(), Scope.PRIVATE)));
 						if (!isInitial) {
-							input.add(new SimpleElementImpl<String>("workflowId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input));
+							input.add(new SimpleElementImpl<UUID>("workflowId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(UUID.class), input));
 							// a global state can be called from anywhere, force and besteffort have no power here
 							if (!fromState.isGlobalState()) {
 								input.add(new SimpleElementImpl<Boolean>("force", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(Boolean.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "If the workflow is not in the correct state, do you still want to trigger this transition? This is especially interesting for forcing a retry at a specific state."),
@@ -59,11 +60,11 @@ public class WorkflowTransitionServiceInterface implements DefinedServiceInterfa
 							}
 						}
 						else {
-							input.add(new SimpleElementImpl<String>("workflowId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "A pregenerated id for the workflow"),
+							input.add(new SimpleElementImpl<UUID>("workflowId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(UUID.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "A pregenerated id for the workflow"),
 								new ValueImpl<Scope>(ScopeProperty.getInstance(), Scope.PRIVATE)));
-							input.add(new SimpleElementImpl<String>("parentId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "The id of the parent workflow"),
+							input.add(new SimpleElementImpl<UUID>("parentId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(UUID.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "The id of the parent workflow"),
 								new ValueImpl<Scope>(ScopeProperty.getInstance(), Scope.PRIVATE)));
-							input.add(new SimpleElementImpl<String>("batchId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "The id of the batch it belongs to"),
+							input.add(new SimpleElementImpl<UUID>("batchId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(UUID.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "The id of the batch it belongs to"),
 								new ValueImpl<Scope>(ScopeProperty.getInstance(), Scope.PRIVATE)));
 							input.add(new SimpleElementImpl<String>("correlationId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "A free to choose correlation id that can link this workflow to something else")));
 							input.add(new SimpleElementImpl<String>("contextId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), input, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0), new ValueImpl<String>(CommentProperty.getInstance(), "A contextually relevant id for this instance of the workflow, for example an invoice number")));

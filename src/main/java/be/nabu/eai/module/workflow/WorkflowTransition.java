@@ -2,6 +2,7 @@ package be.nabu.eai.module.workflow;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import javax.xml.bind.annotation.XmlTransient;
 import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
@@ -18,11 +19,11 @@ import be.nabu.libs.types.api.annotation.Field;
 		"line2FromX", "line2FromY", "line2ToX", "line2ToY", "allowMultipleAutomaticExecutions", "target", "targetProperties" })
 public class WorkflowTransition implements Comparable<WorkflowTransition> {
 	// a generated if for this state
-	private String id;
+	private UUID id;
 	// the name of the state
 	private String name, description;
 	// the state we move to after the transition is done
-	private String targetStateId;
+	private UUID targetStateId;
 	// the roles that are allowed to run this transition
 	private List<String> roles;
 	// query used to trigger this transition
@@ -50,10 +51,11 @@ public class WorkflowTransition implements Comparable<WorkflowTransition> {
 	// @2021-04-16: this has no value by default because (for backwards compatibility) this is "false" for self transitions and "true" for non-self transitions by default
 	private Boolean allowMultipleAutomaticExecutions;
 	
-	public String getId() {
+	@XmlJavaTypeAdapter(value = UuidXmlAdapter.class)
+	public UUID getId() {
 		return id;
 	}
-	public void setId(String id) {
+	public void setId(UUID id) {
 		this.id = id;
 	}
 	public String getName() {
@@ -70,10 +72,11 @@ public class WorkflowTransition implements Comparable<WorkflowTransition> {
 		this.description = description;
 	}
 
-	public String getTargetStateId() {
+	@XmlJavaTypeAdapter(value = UuidXmlAdapter.class)
+	public UUID getTargetStateId() {
 		return targetStateId;
 	}
-	public void setTargetStateId(String targetStateId) {
+	public void setTargetStateId(UUID targetStateId) {
 		this.targetStateId = targetStateId;
 	}
 	

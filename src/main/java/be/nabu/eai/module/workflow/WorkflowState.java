@@ -2,17 +2,20 @@ package be.nabu.eai.module.workflow;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
+
+import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 
 public class WorkflowState {
 	// a generated if for this state
-	private String id;
+	private UUID id;
 	// the name of the state
 	private String name, description;
 	// the possible transitions out of this state
 	private List<WorkflowTransition> transitions;
 	// you can extend this state with other states
 	// this allows for reusable transitions
-	private List<String> extensions;
+	private List<UUID> extensions;
 	// visual positioning
 	private double x, y;
 	// a global state is inherently extended by all other states, this means it has no extensions, nothing going to it but it is _not_ an initial state
@@ -23,10 +26,11 @@ public class WorkflowState {
 	// however, you can explicitly choose to mark a state as final (or not final), use with caution
 	private Boolean finalState;
 	
-	public String getId() {
+	@XmlJavaTypeAdapter(value = UuidXmlAdapter.class)
+	public UUID getId() {
 		return id;
 	}
-	public void setId(String id) {
+	public void setId(UUID id) {
 		this.id = id;
 	}
 	public String getName() {
@@ -64,10 +68,12 @@ public class WorkflowState {
 	public void setY(double y) {
 		this.y = y;
 	}
-	public List<String> getExtensions() {
+	
+	@XmlJavaTypeAdapter(value = UuidXmlAdapter.class)
+	public List<UUID> getExtensions() {
 		return extensions;
 	}
-	public void setExtensions(List<String> extensions) {
+	public void setExtensions(List<UUID> extensions) {
 		this.extensions = extensions;
 	}
 	public boolean isGlobalState() {

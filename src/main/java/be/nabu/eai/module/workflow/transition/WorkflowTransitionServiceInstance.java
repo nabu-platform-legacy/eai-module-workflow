@@ -86,7 +86,7 @@ public class WorkflowTransitionServiceInstance implements ServiceInstance {
 			instance.setStarted(new Date());
 			instance.setDefinitionId(service.getWorkflow().getId());
 			instance.setEnvironment(service.getWorkflow().getRepository().getGroup());
-			instance.setStateId(UUID.fromString(service.getFromState().getId()));
+			instance.setStateId(service.getFromState().getId());
 			instance.setTransitionState(Level.RUNNING);
 			
 			// when creating a workflow and we are interested in versioning, make sure the version is persisted somewhere
@@ -133,7 +133,7 @@ public class WorkflowTransitionServiceInstance implements ServiceInstance {
 			// a global state can be triggered from anywhere
 			if (!instance.getStateId().equals(service.getFromState().getId()) && !service.getFromState().isGlobalState()) {
 				// check if the "from state" is actually an extension
-				WorkflowState state = service.getWorkflow().getStateById(instance.getStateId().toString().replace("-", ""));
+				WorkflowState state = service.getWorkflow().getStateById(instance.getStateId());
 				
 				// check if the state is the same as the source state of this service or an extension
 				boolean isExtension = isExtension(state, new HashSet<WorkflowState>());
@@ -204,7 +204,7 @@ public class WorkflowTransitionServiceInstance implements ServiceInstance {
 		checkedStates.add(currentState);
 		// the state extends other states, check those as well
 		if (currentState.getExtensions() != null) {
-			for (String stateId : currentState.getExtensions()) {
+			for (UUID stateId : currentState.getExtensions()) {
 				WorkflowState stateById = service.getWorkflow().getStateById(stateId);
 				if (isExtension(stateById, checkedStates)) {
 					return true;

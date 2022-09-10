@@ -39,6 +39,7 @@ public class WorkflowInstance {
 		this.parentId = parentId;
 	}
 	
+	@Field(foreignKey = "nabu.misc.workflow.types.workflowDefinition:id")
 	@NotNull
 	public String getDefinitionId() {
 		return definitionId;
@@ -61,7 +62,8 @@ public class WorkflowInstance {
 	public void setStopped(Date stopped) {
 		this.stopped = stopped;
 	}
-	
+
+	@Field(foreignKey = "nabu.misc.workflow.types.workflowState:id")
 	@NotNull
 	public UUID getStateId() {
 		return stateId;

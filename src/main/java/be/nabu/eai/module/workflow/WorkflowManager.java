@@ -8,6 +8,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import be.nabu.eai.module.services.vm.VMServiceManager;
 import be.nabu.eai.module.types.structure.StructureManager;
@@ -56,6 +57,18 @@ public class WorkflowManager extends JAXBArtifactManager<WorkflowConfiguration, 
 	protected Workflow newInstance(String id, ResourceContainer<?> container, Repository repository) {
 		return new Workflow(id, container, repository);
 	}
+	
+	
+	public static UUID fromString(String uuid) {
+		if (uuid == null) {
+			return null;
+		}
+		if (uuid.indexOf('-') < 0) {
+			uuid = uuid.substring(0, 8) + "-" + uuid.substring(8, 12) + "-" + uuid.substring(12, 16) + "-" + uuid.substring(16, 20) + "-" + uuid.substring(20);
+		}
+		return UUID.fromString(uuid);
+	}
+	
 
 	@Override
 	public List<String> getReferences(Workflow artifact) throws IOException {
@@ -110,13 +123,13 @@ public class WorkflowManager extends JAXBArtifactManager<WorkflowConfiguration, 
 						name = "properties";
 					}
 					else {
-						WorkflowState stateById = workflow.getStateById(child.getName());
+						WorkflowState stateById = workflow.getStateById(fromString(child.getName()));
 						if (stateById != null) {
 							group = "types.states";
 							name = EAIRepositoryUtils.stringToField(stateById.getName());
 						}
 						else {
-							WorkflowTransition transitionById = workflow.getTransitionById(child.getName());
+							WorkflowTransition transitionById = workflow.getTransitionById(fromString(child.getName()));
 							if (transitionById == null) {
 								continue;
 							}
@@ -165,8 +178,8 @@ public class WorkflowManager extends JAXBArtifactManager<WorkflowConfiguration, 
 			if (services != null) {
 				for (Resource child : (ResourceContainer<?>) services) {
 					// make sure we set the pipeline interface property for consistent results
-					WorkflowTransition transition = workflow.getTransitionById(child.getName());
-					WorkflowState fromState = workflow.getTransitionFromState(child.getName());
+					WorkflowTransition transition = workflow.getTransitionById(fromString(child.getName()));
+					WorkflowState fromState = workflow.getTransitionFromState(fromString(child.getName()));
 					WorkflowTransitionMappingInterface iface = new WorkflowTransitionMappingInterface(workflow, fromState, transition);
 					
 					VMService loaded;
@@ -246,13 +259,13 @@ public class WorkflowManager extends JAXBArtifactManager<WorkflowConfiguration, 
 				name = "properties";
 			}
 			else {
-				WorkflowState stateById = artifact.getStateById(id);
+				WorkflowState stateById = artifact.getStateById(fromString(id));
 				if (stateById != null) {
 					name = EAIRepositoryUtils.stringToField(stateById.getName());
 					group = "states";
 				}
 				else {
-					WorkflowTransition transitionById = artifact.getTransitionById(id);
+					WorkflowTransition transitionById = artifact.getTransitionById(fromString(id));
 					if (transitionById != null) {
 						name = EAIRepositoryUtils.stringToField(transitionById.getName());
 						group = "transitions";
@@ -278,18 +291,18 @@ public class WorkflowManager extends JAXBArtifactManager<WorkflowConfiguration, 
 		// we need a service for each transition
 		ModifiableEntry services = EAIRepositoryUtils.getParent(parent, "services", true);
 		
-		Map<String, WorkflowState> initialStates = new HashMap<String, WorkflowState>();
-		List<String> targetedStates = new ArrayList<String>();
+		Map<UUID, WorkflowState> initialStates = new HashMap<UUID, WorkflowState>();
+		List<UUID> targetedStates = new ArrayList<UUID>();
 		for (WorkflowState state : artifact.getConfig().getStates()) {
 			// extension states are not initial states, nor are global states
-			if (!artifact.isExtensionState(state.getId()) && !artifact.isExtensionState(state.getName()) && !state.isGlobalState()) {
+			if (!artifact.isExtensionState(state.getId()) && !state.isGlobalState()) {
 				initialStates.put(state.getId(), state);
 			}
 			for (WorkflowTransition transition : state.getTransitions()) {
 				targetedStates.add(transition.getTargetStateId());
 			}
 		}
-		for (String targetedState : targetedStates) {
+		for (UUID targetedState : targetedStates) {
 			initialStates.remove(targetedState);
 		}
 		
