@@ -107,14 +107,14 @@ public class WorkflowTransitionServiceInstance implements ServiceInstance {
 		else {
 			UUID workflowId = input == null ? null : (UUID) input.get("workflowId");
 			if (workflowId == null) {
-				throw new ServiceException("WORKFLOW-1", "No workflow id given");
+				throw new ServiceException("WORKFLOW-1", "No workflow id given (" + service.getWorkflow().getId() + ")");
 			}
 			WorkflowManager workflowManager = service.getWorkflow().getConfig().getProvider().getWorkflowManager();
 			
 			instance = workflowManager.getWorkflow(connectionId, workflowId);
 			
 			if (instance == null) {
-				throw new ServiceException("WORKFLOW-3", "The workflow id is invalid: " + workflowId);
+				throw new ServiceException("WORKFLOW-3", "The workflow id '" + workflowId + "' is not a workflow instance (" + service.getWorkflow().getId() + ")");
 			}
 			
 			if (!service.getWorkflow().getId().equals(instance.getDefinitionId())) {
@@ -127,7 +127,7 @@ public class WorkflowTransitionServiceInstance implements ServiceInstance {
 			// cause we _could_ allow that, but than every transition afterwards would need to be forced, as the anonymized boolean stays on
 			// so we would have to think on unsetting the boolean? we're gonna wait for an actual usecase
 			if (instance.getAnonymized() != null && instance.getAnonymized()) {
-				throw new ServiceException("WORKFLOW-ANONYMIZED", "Workflow " + workflowId + " is anonymized, you can no longer perform transitions on it");
+				throw new ServiceException("WORKFLOW-ANONYMIZED", "Workflow " + workflowId + " (" + service.getWorkflow().getId() + ") is anonymized, you can no longer perform transitions on it");
 			}
 			
 			// a global state can be triggered from anywhere
@@ -146,7 +146,7 @@ public class WorkflowTransitionServiceInstance implements ServiceInstance {
 							logger.warn("Skipped best effort transition: " + service.getId());
 							return null;
 						}
-						throw new ServiceException("WORKFLOW-0", "Workflow " + workflowId + " is not in the correct state to trigger this transition");
+						throw new ServiceException("WORKFLOW-0", "Workflow " + workflowId + " (" + service.getWorkflow().getId() + ") is not in the correct state to trigger this transition");
 					}
 				}
 			}

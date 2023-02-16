@@ -203,10 +203,12 @@ public class WorkflowRESTListener implements EventHandler<HTTPRequest, HTTPRespo
 					permissionContext = result.toString();
 				}
 			}
-			WebApplicationUtils.checkPermission(application, token, service.getTransition().getPermissionAction(), permissionContext);
+			WebApplicationUtils.checkPermission(application, request, token, service.getTransition().getPermissionAction(), permissionContext);
 		}
 		
 		ServiceRuntime runtime = new ServiceRuntime(service, application.getRepository().newExecutionContext(token));
+		runtime.setSlaProvider(application);
+		
 		runtime.getContext().put("session", WebApplicationUtils.getSession(application, request));
 		runtime.getContext().put("device", device);
 //		ServiceUtils.setServiceContext(runtime, service.getId());

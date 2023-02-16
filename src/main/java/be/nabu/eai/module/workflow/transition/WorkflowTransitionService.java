@@ -202,5 +202,9 @@ public class WorkflowTransitionService implements DefinedService, WebFragment, R
 	public List<Element<?>> getPathParameters() {
 		return new ArrayList<Element<?>>();
 	}
-	
+
+	@Override
+	public String getDescription() {
+		return null;
+	}
 }
